@@ -86,7 +86,52 @@ resolve_port() {
 }
 
 port_listener_pid() {
-  lsof -nP -iTCP:"$1" -sTCP:LISTEN -t 2>/dev/null | head -n 1 || true
+  local from_lsof
+  from_lsof="$(lsof -nP -iTCP:"$1" -sTCP:LISTEN -t 2>/dev/null | head -n 1 || true)"
+  if [[ -n "$from_lsof" ]]; then
+    echo "$from_lsof"
+    return
+  fi
+  # lsof cannot see sockets in this environment. Match the listening inode in
+  # /proc/net/tcp to the process that owns it.
+  python3 - "$1" <<'PY'
+import os
+import sys
+
+port = int(sys.argv[1])
+needle = f":{port:04X}"
+inodes = set()
+for name in ("/proc/net/tcp", "/proc/net/tcp6"):
+    try:
+        lines = open(name, encoding="utf-8").read().splitlines()
+    except OSError:
+        continue
+    for line in lines[1:]:
+        parts = line.split()
+        if len(parts) < 10:
+            continue
+        local, state, inode = parts[1], parts[3], parts[9]
+        if state == "0A" and local.upper().endswith(needle):
+            inodes.add(inode)
+if not inodes:
+    sys.exit(0)
+for pid in os.listdir("/proc"):
+    if not pid.isdigit():
+        continue
+    fd_dir = f"/proc/{pid}/fd"
+    try:
+        fds = os.listdir(fd_dir)
+    except OSError:
+        continue
+    for fd in fds:
+        try:
+            target = os.readlink(f"{fd_dir}/{fd}")
+        except OSError:
+            continue
+        if target.startswith("socket:[") and target[8:-1] in inodes:
+            print(pid)
+            sys.exit(0)
+PY
 }
 
 cmd_launch() {

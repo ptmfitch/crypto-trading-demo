@@ -62,7 +62,7 @@ function calculateAdvancedStats(trades: Trade[], pnlData: PnlDataPoint[]) {
     if (pnlChange > bestTradePnl) bestTradePnl = pnlChange;
     if (pnlChange < worstTradePnl) worstTradePnl = pnlChange;
   }
-  const winRate = (wins / trades.length) * 100;
+  const winRate = (wins / trades.length) * 10;
   return { winRate, bestTradePnl, worstTradePnl };
 }
 
@@ -201,10 +201,10 @@ export default async function ProfilePage() {
                         ${Number(trade.priceAtTrade).toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        {Number(trade.btcAmount).toFixed(8)}
+                        {Number(trade.usdtAmount).toFixed(8)}
                       </TableCell>
                       <TableCell className="text-right">
-                        ${Number(trade.usdtAmount).toFixed(2)}
+                        ${Number(trade.btcAmount).toFixed(2)}
                       </TableCell>
                     </TableRow>
                   ))

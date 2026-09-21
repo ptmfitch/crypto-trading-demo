@@ -1,11 +1,24 @@
 #!/usr/bin/env node
 // Drive a verification TradeSim instance through system Chrome's DevTools port.
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-const CHROME =
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+function chromeBinary() {
+  const candidates = [
+    process.env.CHROME,
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/local/bin/google-chrome",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  ].filter(Boolean);
+  const found = candidates.find((candidate) => existsSync(candidate));
+  if (!found) {
+    throw new Error("Chrome not found. Set CHROME to the browser binary.");
+  }
+  return found;
+}
 const STATE_DIR = process.env.TRADESIM_VERIFY_STATE_DIR || "/tmp/tradesim-verify";
 
 function usage() {
@@ -173,6 +186,9 @@ const FIND_SCRIPT = `async (request) => {
     const names = [...document.querySelectorAll("a,button,input,textarea,label")].map((candidate) => accessibleName(candidate)).filter(Boolean);
     throw new Error(\`No \${request.role} named "\${request.name}". Visible names: \${names.join(" | ")}\`);
   }
+  if (element.disabled || element.getAttribute("aria-disabled") === "true") {
+    throw new Error(\`\${request.role} named "\${request.name}" is disabled\`);
+  }
   element.scrollIntoView({ block: "center" });
   if (request.value !== undefined) {
     const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement;
@@ -216,10 +232,11 @@ async function start(port) {
   const userDataDir = `${STATE_DIR}/chrome-${port}`;
   await mkdir(userDataDir, { recursive: true });
   const chrome = spawn(
-    CHROME,
+    chromeBinary(),
     [
       "--headless=new",
       "--disable-gpu",
+      "--disable-dev-shm-usage",
       `--remote-debugging-port=${cdpPort}`,
       `--user-data-dir=${userDataDir}`,
       "about:blank",
@@ -348,8 +365,13 @@ async function main() {
         if (!node) return;
         const role = node.role?.value || "";
         const name = node.name?.value || "";
+        const disabled = (node.properties || []).some(
+          (prop) => prop.name === "disabled" && prop.value?.value
+        );
         if (role && role !== "none" && role !== "generic" && role !== "InlineTextBox") {
-          lines.push(`${"  ".repeat(depth)}${role}${name ? ` "${name}"` : ""}`);
+          lines.push(
+            `${"  ".repeat(depth)}${role}${name ? ` "${name}"` : ""}${disabled ? " disabled" : ""}`
+          );
         }
         for (const childId of node.childIds || []) visit(childId, depth + 1);
       };

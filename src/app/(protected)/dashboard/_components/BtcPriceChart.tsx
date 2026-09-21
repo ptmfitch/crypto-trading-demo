@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -20,6 +21,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  quoteDelayLabel,
+  type BtcQuoteStatus,
+} from "@/lib/btc-quote";
 import * as React from "react";
 import {
   Area,
@@ -39,26 +44,72 @@ const timeRangeOptions = [
   { label: "Last Year", value: "365" },
 ];
 
+function chartStatus(value: unknown): BtcQuoteStatus | null {
+  if (value === "fresh" || value === "stale" || value === "unavailable") {
+    return value;
+  }
+  return null;
+}
+
 export function BtcPriceChart() {
   const [data, setData] = React.useState<ChartDataPoint[]>([]);
+  const [loadedRange, setLoadedRange] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [quoteStatus, setQuoteStatus] = React.useState<BtcQuoteStatus>("fresh");
   const [timeRange, setTimeRange] = React.useState("30");
+  const dataRef = React.useRef(data);
+  const loadedRangeRef = React.useRef(loadedRange);
+  dataRef.current = data;
+  loadedRangeRef.current = loadedRange;
 
   React.useEffect(() => {
+    let cancelled = false;
     const fetchData = async () => {
-      setIsLoading(true);
+      const hasThisRange = loadedRangeRef.current === timeRange;
+      if (!hasThisRange) setIsLoading(true);
       try {
-        const response = await fetch(`/api/btc-chart?days=${timeRange}`);
-        const chartData = await response.json();
-        setData(chartData);
+        const response = await fetch(`/api/btc-chart?days=${timeRange}`, {
+          cache: "no-store",
+        });
+        const payload = await response.json();
+        if (cancelled) return;
+        const points = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.points)
+            ? payload.points
+            : null;
+        const status = chartStatus(payload?.status);
+        if (!response.ok || !points || points.length === 0) {
+          if (hasThisRange && dataRef.current.length > 0) {
+            setQuoteStatus("stale");
+          } else {
+            setData([]);
+            setLoadedRange(null);
+            setQuoteStatus(status === "stale" ? "stale" : "unavailable");
+          }
+          return;
+        }
+        setData(points);
+        setLoadedRange(timeRange);
+        setQuoteStatus(status ?? "fresh");
       } catch (error) {
+        if (cancelled) return;
         console.error("Failed to fetch chart data", error);
-        setData([]);
+        if (hasThisRange && dataRef.current.length > 0) {
+          setQuoteStatus("stale");
+        } else {
+          setData([]);
+          setLoadedRange(null);
+          setQuoteStatus("unavailable");
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
     fetchData();
+    return () => {
+      cancelled = true;
+    };
   }, [timeRange]);
 
   const { chartDomain, isPositiveChange, currentPrice, priceChange } =
@@ -94,15 +145,21 @@ export function BtcPriceChart() {
     ? "hsl(var(--chart-positive))"
     : "hsl(var(--chart-negative))";
   const fillColorId = isPositiveChange ? "fillPositive" : "fillNegative";
+  const showSkeleton = isLoading && loadedRange !== timeRange;
+  const delayLabel = quoteDelayLabel(quoteStatus);
 
   return (
     <Card>
       <CardHeader className="flex flex-col items-start gap-4 space-y-0 border-b py-5 sm:flex-row sm:items-center sm:gap-6">
         <div className="grid flex-1 gap-1">
-          <CardTitle>Bitcoin Price</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Bitcoin Price
+            {delayLabel ? <Badge variant="outline">{delayLabel}</Badge> : null}
+          </CardTitle>
           <CardDescription>
-            {isPositiveChange ? "Increased" : "Decreased"} by $
-            {priceChange.value.toFixed(2)} ({priceChange.percent.toFixed(2)}%)
+            {data.length === 0
+              ? "Chart unavailable"
+              : `${isPositiveChange ? "Increased" : "Decreased"} by $${priceChange.value.toFixed(2)} (${priceChange.percent.toFixed(2)}%)`}
           </CardDescription>
         </div>
         <Select value={timeRange} onValueChange={setTimeRange}>
@@ -122,8 +179,12 @@ export function BtcPriceChart() {
         </Select>
       </CardHeader>
       <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
-        {isLoading ? (
+        {showSkeleton ? (
           <Skeleton className="h-[250px] w-full" />
+        ) : data.length === 0 ? (
+          <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
+            Chart unavailable
+          </div>
         ) : (
           <ChartContainer config={{}} className="aspect-auto h-[250px] w-full">
             <AreaChart data={data}>

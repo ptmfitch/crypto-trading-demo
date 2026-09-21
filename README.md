@@ -56,8 +56,8 @@ A modern, full-stack demo trading platform for learning crypto trading, built wi
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/aaurelions/CryptoTradingSimulator demo-trade
-cd demo-trade
+git clone https://github.com/ptmfitch/crypto-trading-demo
+cd crypto-trading-demo
 ```
 
 ### 2. Install dependencies

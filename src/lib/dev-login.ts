@@ -38,6 +38,7 @@ export async function listTestAccounts(): Promise<TestAccount[]> {
   }
 
   const users = await prisma.user.findMany({
+    take: 50,
     orderBy: [{ name: "asc" }, { email: "asc" }],
     select: {
       email: true,

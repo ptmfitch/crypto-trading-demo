@@ -227,14 +227,7 @@ export function TradeForm({
 
           <Button
             type="submit"
-            className={cn(
-              "w-full text-lg font-semibold",
-              quoteReady
-                ? tradeType === "BUY"
-                  ? "bg-[--buy] text-[--buy-foreground] hover:bg-[--buy]/90"
-                  : "bg-[--sell] text-[--sell-foreground] hover:bg-[--sell]/90"
-                : "bg-muted text-muted-foreground hover:bg-muted"
-            )}
+            className="w-full"
             disabled={isPending || !quoteReady}
           >
             {isPending ? "Processing..." : `${tradeType} BTC`}

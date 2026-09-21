@@ -11,6 +11,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import prisma from "@/lib/prisma";
+import {
+  formatTradeHistoryBtc,
+  formatTradeHistoryTotal,
+} from "@/lib/trade-history";
 import { Trade } from "@prisma/client";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import Link from "next/link";
@@ -201,10 +205,10 @@ export default async function ProfilePage() {
                         ${Number(trade.priceAtTrade).toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        {Number(trade.usdtAmount).toFixed(8)}
+                        {formatTradeHistoryBtc(trade.btcAmount)}
                       </TableCell>
                       <TableCell className="text-right">
-                        ${Number(trade.btcAmount).toFixed(2)}
+                        {formatTradeHistoryTotal(trade.usdtAmount)}
                       </TableCell>
                     </TableRow>
                   ))

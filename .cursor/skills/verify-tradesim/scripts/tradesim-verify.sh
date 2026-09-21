@@ -38,6 +38,25 @@ latest_file() {
   echo "$STATE_DIR/latest"
 }
 
+refresh_latest_pointer() {
+  local latest port
+  latest="$(latest_file)"
+  if [[ -f "$latest" ]]; then
+    port="$(awk -F= '/^PORT=/{print $2; exit}' "$latest")"
+    if [[ -n "${port:-}" && -f "$(state_file_for_port "$port")" ]]; then
+      return
+    fi
+  fi
+  shopt -s nullglob
+  local remaining=("$STATE_DIR"/[0-9]*.env)
+  shopt -u nullglob
+  if [[ ${#remaining[@]} -gt 0 ]]; then
+    cp "${remaining[0]}" "$latest"
+  else
+    rm -f "$latest"
+  fi
+}
+
 load_state() {
   local file="$1"
   if [[ ! -f "$file" ]]; then
@@ -334,7 +353,7 @@ cmd_cleanup() {
   local files=()
   if [[ "$all" == "1" ]]; then
     shopt -s nullglob
-    files=("$STATE_DIR"/*.env)
+    files=("$STATE_DIR"/[0-9]*.env)
     shopt -u nullglob
   else
     port="$(resolve_port "$port")"
@@ -394,7 +413,7 @@ cmd_cleanup() {
     fi
     rm -f "$file"
   done
-  rm -f "$(latest_file)"
+  refresh_latest_pointer
   echo "Artifacts kept at $ARTIFACTS_DIR"
 }
 

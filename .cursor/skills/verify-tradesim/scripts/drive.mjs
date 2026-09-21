@@ -68,6 +68,24 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function waitForLoad(session, url) {
+  const path = new URL(url).pathname;
+  for (let attempt = 0; attempt < 360; attempt += 1) {
+    try {
+      const info = await session.evaluate(
+        `({ path: location.pathname, ready: document.readyState })`
+      );
+      if (info && info.ready === "complete" && info.path === path) {
+        return;
+      }
+    } catch {
+      // Page.navigate is still swapping the document.
+    }
+    await sleep(250);
+  }
+  throw new Error(`Timed out loading ${url}`);
+}
+
 async function waitForJson(url) {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     try {
@@ -146,7 +164,7 @@ const FIND_SCRIPT = `async (request) => {
     }
     const wrapping = element.closest("label");
     if (wrapping) return wrapping.innerText.trim();
-    return (element.innerText || element.value || element.getAttribute("placeholder") || "").trim();
+    return (element.innerText || element.getAttribute("placeholder") || element.value || "").trim();
   };
   const element = [...document.querySelectorAll("a,button,input,textarea,select,[role]")].find((candidate) => {
     return interesting(candidate) && accessibleName(candidate) === request.name;
@@ -286,12 +304,7 @@ async function main() {
       const path = args._[1] || "/";
       const url = `http://127.0.0.1:${port}${path.startsWith("/") ? path : `/${path}`}`;
       await session.send("Page.navigate", { url });
-      await session.evaluate(`(async () => {
-        if (document.readyState !== "complete") {
-          await new Promise((resolve) => window.addEventListener("load", resolve, { once: true }));
-        }
-        return document.title;
-      })()`);
+      await waitForLoad(session, url);
       console.log(url);
     } else if (command === "click") {
       const result = await session.evaluate(FIND_SCRIPT, {
@@ -300,12 +313,7 @@ async function main() {
       });
       if (result?.action === "navigate" && result.href) {
         await session.send("Page.navigate", { url: result.href });
-        await session.evaluate(`(async () => {
-          if (document.readyState !== "complete") {
-            await new Promise((resolve) => window.addEventListener("load", resolve, { once: true }));
-          }
-          return location.pathname;
-        })()`);
+        await waitForLoad(session, result.href);
       }
       console.log(`clicked ${args.role} ${args.name}`);
     } else if (command === "fill") {

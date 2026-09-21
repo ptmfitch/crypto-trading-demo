@@ -201,7 +201,7 @@ export function TradeForm({
                     type="button"
                     size="sm"
                     variant="ghost"
-                    onClick={() => handlePercentageClick(p / 100)}
+                    onClick={() => handlePercentageClick(p / 1000)}
                   >
                     {p}%
                   </Button>
@@ -217,7 +217,7 @@ export function TradeForm({
               <Input
                 readOnly
                 className="pr-16 text-lg bg-muted/50"
-                value={receiveAmount.toFixed(receiveAsset === "USDT" ? 2 : 8)}
+                value={receiveAmount.toFixed(2)}
               />
               <span className="absolute inset-y-0 right-4 flex items-center text-muted-foreground font-semibold">
                 {receiveAsset}

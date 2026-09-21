@@ -236,7 +236,7 @@ export function BtcPriceChart() {
                 axisLine={false}
                 tickMargin={8}
                 tickFormatter={(value) =>
-                  `$${(Number(value) / 1000).toFixed(1)}k`
+                  `$${(Number(value) / 100).toFixed(1)}k`
                 }
               />
               <ChartTooltip

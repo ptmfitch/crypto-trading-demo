@@ -15,6 +15,11 @@ Usage: tradesim-verify.sh <command> [options]
   doctor [--port PORT]   Read-only health check for one instance.
   wallet EMAIL [--port PORT]
                           Print the user and wallet row for EMAIL.
+  fault fail|live [--port PORT]
+                          Pause or restore the CoinGecko quote for this instance.
+                          The server reads the flag on the next request.
+  quote [clear] [--port PORT]
+                          Print the cached BTC quote JSON, or delete it with clear.
   cleanup [--port PORT | --all]
                           Stop instances this script started and delete their data dirs.
                           Leaves .cursor/skills/verify-tradesim/artifacts in place.
@@ -86,7 +91,26 @@ resolve_port() {
 }
 
 port_listener_pid() {
-  lsof -nP -iTCP:"$1" -sTCP:LISTEN -t 2>/dev/null | head -n 1 || true
+  local port="$1"
+  local pid inode hex fd
+  pid="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -n 1 || true)"
+  if [[ -n "$pid" ]]; then
+    echo "$pid"
+    return
+  fi
+  # lsof is installed in some sandboxes but cannot see sockets. /proc still can.
+  hex="$(printf '%04X' "$port")"
+  inode="$(awk -v suffix=":$hex" 'NR > 1 && $4 == "0A" && substr($2, length($2) - length(suffix) + 1) == suffix { print $10; exit }' /proc/net/tcp /proc/net/tcp6 2>/dev/null || true)"
+  if [[ -z "${inode:-}" || "$inode" == "0" ]]; then
+    return
+  fi
+  for fd in /proc/[0-9]*/fd/*; do
+    if [[ "$(readlink "$fd" 2>/dev/null || true)" == "socket:[$inode]" ]]; then
+      pid="${fd#/proc/}"
+      echo "${pid%%/*}"
+      return
+    fi
+  done
 }
 
 cmd_launch() {
@@ -119,14 +143,19 @@ cmd_launch() {
   mkdir -p "$root"
   secret="$(openssl rand -hex 32)"
   state="$(state_file_for_port "$port")"
+  printf 'live\n' >"$root/fault"
 
   cat >"$root/env" <<EOF
 DATABASE_URL=file:$root/dev.db
 AUTH_SECRET=$secret
 AUTH_TRUST_HOST=true
 NEXTAUTH_URL=http://127.0.0.1:$port
+AUTH_URL=http://127.0.0.1:$port
 NEXT_PUBLIC_APP_URL=http://127.0.0.1:$port
 DEV_LOGIN=true
+BTC_PRICE_CACHE_FILE=$root/btc-price.json
+BTC_CHART_CACHE_FILE=$root/btc-chart.json
+BTC_PRICE_FAULT_FILE=$root/fault
 EOF
 
   # shellcheck disable=SC1090
@@ -331,6 +360,79 @@ WHERE u.email = '$email_sql';
 SQL
 }
 
+cmd_fault() {
+  local mode="" port=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --port)
+        port="$2"
+        shift 2
+        ;;
+      *)
+        if [[ -z "$mode" ]]; then
+          mode="$1"
+          shift
+        else
+          echo "Unexpected argument: $1" >&2
+          exit 1
+        fi
+        ;;
+    esac
+  done
+  if [[ "$mode" != "fail" && "$mode" != "live" ]]; then
+    echo "fault mode must be fail or live" >&2
+    exit 1
+  fi
+  port="$(resolve_port "$port")"
+  load_state "$(state_file_for_port "$port")"
+  if [[ -z "${ROOT:-}" || "$ROOT" != "$STATE_DIR"/run-* ]]; then
+    echo "Refusing to write a fault file outside a verification run." >&2
+    exit 1
+  fi
+  printf '%s\n' "$mode" >"$ROOT/fault"
+  echo "FAULT=$mode"
+}
+
+cmd_quote() {
+  local port="" action="show"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --port)
+        port="$2"
+        shift 2
+        ;;
+      clear)
+        action="clear"
+        shift
+        ;;
+      *)
+        echo "Unknown quote option: $1" >&2
+        exit 1
+        ;;
+    esac
+  done
+  port="$(resolve_port "$port")"
+  load_state "$(state_file_for_port "$port")"
+  if [[ -z "${ROOT:-}" || "$ROOT" != "$STATE_DIR"/run-* ]]; then
+    echo "Refusing to touch a quote cache outside a verification run." >&2
+    exit 1
+  fi
+  if [[ "$action" == "clear" ]]; then
+    rm -f "$ROOT/btc-price.json"
+    echo "CLEARED $ROOT/btc-price.json"
+    return
+  fi
+  if [[ -f "$ROOT/btc-price.json" ]]; then
+    cat "$ROOT/btc-price.json"
+    echo
+  else
+    echo "NO_CACHE"
+  fi
+  if [[ -f "$ROOT/fault" ]]; then
+    echo "FAULT=$(tr -d '\n' <"$ROOT/fault")"
+  fi
+}
+
 cmd_cleanup() {
   local port="" all=0
   while [[ $# -gt 0 ]]; do
@@ -428,6 +530,8 @@ main() {
     launch) cmd_launch "$@" ;;
     doctor) cmd_doctor "$@" ;;
     wallet) cmd_wallet "$@" ;;
+    fault) cmd_fault "$@" ;;
+    quote) cmd_quote "$@" ;;
     cleanup) cmd_cleanup "$@" ;;
     -h|--help|help) usage ;;
     *)

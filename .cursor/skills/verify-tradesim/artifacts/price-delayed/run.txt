@@ -1,0 +1,5 @@
+feature: price-delayed
+entry: /dashboard after login
+url: http://127.0.0.1:4173/dashboard
+port: 4173
+order: live buy ran first; the pause left trades at 1 and cash at 9900

@@ -34,6 +34,7 @@ Preconditions:
 
 - The `You Pay` label is not the input's accessible name. Target the number input that shows placeholder `0.00`.
 - `25%`, `50%`, and `100%` replace the pay amount with a fraction of available USDT. `100%` on Sell uses the full BTC balance.
-- The price comes from CoinGecko at submit time. Assert that cash went down and BTC went up, not a fixed BTC quantity.
+- The price comes from CoinGecko. Assert that cash went down and BTC went up, not a fixed BTC quantity.
+- If the trade card shows `Price delayed` or `Price unavailable`, `BUY BTC` is disabled and this recipe cannot submit. Run `tradesim-verify.sh fault live --port 4173`, reload `/dashboard`, and wait until the chip is gone. Do not claim a buy while the button is disabled.
 - A success toast without a wallet row is not proof. The trade must exist in sqlite and in `Trade History`.
 - Sell is a separate action. This recipe only proves a buy. Selling with an empty BTC balance shows an insufficient-balance error.

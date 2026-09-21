@@ -61,13 +61,15 @@ Stable handles:
 - Landing heading: `Welcome to TradeSim`. Links: `Login`, `Create Account`.
 - Register card text: `Create an Account`. Textboxes: `Name`, `Email`, `Password`. Submit button: `Create Account`. Alternate link: `Login`.
 - Login card text: `Welcome Back`. Textboxes: `Email`, `Password`. Submit button: `Login`. When `DEV_LOGIN=true`, combobox accessible name `Test account`, button `Continue as this account`.
-- Dashboard heading: `Welcome Back, <name>!`. Stat titles: `Portfolio Value`, `Total P&L`, `Live BTC Price`, `Total Trades`. Trade tabs: `Buy`, `Sell`. Amount field: the number input under the visible label `You Pay` (placeholder `0.00`; the label is not wired to the input). Submit button: `BUY BTC` or `SELL BTC`.
+- Dashboard heading: `Welcome Back, <name>!`. Stat titles: `Portfolio Value`, `Total P&L`, `Live BTC Price`, `Total Trades`. Trade tabs: `Buy`, `Sell`. The trade card shows the BTC quote. Amount field: the number input under the visible label `You Pay` (placeholder `0.00`; the label is not wired to the input). Submit button: `BUY BTC` or `SELL BTC`. When the quote is delayed or missing, the card shows a `Price delayed` or `Price unavailable` chip, the quote text is muted, and the submit button is disabled. The pay field and percent buttons stay usable. A disabled control's accessibility snapshot ends with `disabled`.
 - Header links on protected pages: `TradeSim`, `Dashboard`, `Profile`, button `Logout`.
 - Profile heading: `Performance Report`. Section heading: `Trade History`.
 
 Wait for the resulting text with `drive.mjs wait --text` instead of a fixed sleep. Registration and login success appear as a toast and a navigation. A toast alone is not proof.
 
-CoinGecko is the live price boundary behind `/api/btc-price` and trade execution. Do not stub it. If the dashboard shows `Could Not Load Dashboard`, the price fetch failed; record that and do not claim the trade path.
+CoinGecko is the live price boundary behind `/api/btc-price` and trade execution. Do not stub it on the buy path, and do not write a made-up price into the cache file. A failed quote no longer replaces the dashboard with `Could Not Load Dashboard`. The wallet, chart column, and trade form stay up. `Could Not Load Dashboard` means the wallet row itself failed to load.
+
+The launch command points `BTC_PRICE_FAULT_FILE` at this run's `fault` file. `tradesim-verify.sh fault fail` pauses upstream fetches so the next request reuses the last good quote as `Price delayed`, or shows `Price unavailable` when the cache file is absent. `tradesim-verify.sh fault live` restores the feed. Trading stays paused until the quote is fresh again.
 
 ## Evidence
 
@@ -98,6 +100,8 @@ The helper is `.cursor/skills/verify-tradesim/scripts/tradesim-verify.sh`.
 .cursor/skills/verify-tradesim/scripts/tradesim-verify.sh launch --port 4173
 .cursor/skills/verify-tradesim/scripts/tradesim-verify.sh doctor --port 4173
 .cursor/skills/verify-tradesim/scripts/tradesim-verify.sh wallet verify-user@example.com --port 4173
+.cursor/skills/verify-tradesim/scripts/tradesim-verify.sh fault fail --port 4173
+.cursor/skills/verify-tradesim/scripts/tradesim-verify.sh quote --port 4173
 node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 stop
 .cursor/skills/verify-tradesim/scripts/tradesim-verify.sh cleanup --port 4173
 ```

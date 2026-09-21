@@ -1,6 +1,8 @@
 "use server";
 
 import { auth } from "@/auth";
+import { assertTradableQuote } from "@/lib/btc-quote";
+import { getBtcQuote } from "@/lib/btc-market";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -11,20 +13,6 @@ const TradeSchema = z.object({
   tradeType: z.enum(["BUY", "SELL"]),
   asset: z.enum(["USDT", "BTC"]),
 });
-
-async function getLiveBtcPrice() {
-  const response = await fetch(
-    "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
-    { cache: "no-store" }
-  );
-  const data = await response.json();
-  if (!data?.bitcoin?.usd || typeof data.bitcoin.usd !== "number") {
-    throw new Error(
-      "Failed to fetch a valid BTC price. Please try again later."
-    );
-  }
-  return new Prisma.Decimal(data.bitcoin.usd);
-}
 
 export async function executeTrade(values: z.infer<typeof TradeSchema>) {
   const session = await auth();
@@ -40,9 +28,14 @@ export async function executeTrade(values: z.infer<typeof TradeSchema>) {
 
   const { amount, tradeType, asset } = validatedFields.data;
 
+  const tradable = assertTradableQuote(await getBtcQuote());
+  if (!tradable.ok) {
+    return { error: tradable.error };
+  }
+  const liveBtcPrice = new Prisma.Decimal(tradable.usd);
+
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const liveBtcPrice = await getLiveBtcPrice();
       const wallet = await tx.wallet.findUnique({ where: { userId } });
       if (!wallet) throw new Error("Wallet not found.");
 

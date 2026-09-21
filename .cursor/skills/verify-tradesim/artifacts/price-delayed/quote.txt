@@ -1,0 +1,2 @@
+{"usd":85906,"usd24hChange":5.982647265275084,"fetchedAt":1790014000224}
+FAULT=fail

@@ -2,9 +2,14 @@
 
 import { executeTrade } from "@/actions/trade";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  quoteDelayLabel,
+  type BtcQuoteStatus,
+} from "@/lib/btc-quote";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
@@ -19,17 +24,26 @@ const formSchema = z.object({
 });
 
 interface TradeFormProps {
-  initialBtcPrice: number;
+  initialBtcPrice: number | null;
+  quoteStatus: BtcQuoteStatus;
   usdtBalance: number;
   btcBalance: number;
 }
 
+function isQuoteStatus(value: unknown): value is BtcQuoteStatus {
+  return value === "fresh" || value === "stale" || value === "unavailable";
+}
+
 export function TradeForm({
   initialBtcPrice,
+  quoteStatus: initialQuoteStatus,
   usdtBalance,
   btcBalance,
 }: TradeFormProps) {
-  const [btcPrice, setBtcPrice] = useState(initialBtcPrice);
+  const [btcPrice, setBtcPrice] = useState<number | null>(initialBtcPrice);
+  const [quoteStatus, setQuoteStatus] = useState<BtcQuoteStatus>(
+    initialQuoteStatus
+  );
   const [tradeType, setTradeType] = useState<"BUY" | "SELL">("BUY");
   const [isPending, startTransition] = useTransition();
 
@@ -46,7 +60,7 @@ export function TradeForm({
 
   // Calculate the received amount based on the input amount
   const receiveAmount =
-    amount > 0 && btcPrice > 0
+    amount > 0 && btcPrice != null && btcPrice > 0
       ? spendAsset === "USDT"
         ? amount / btcPrice
         : amount * btcPrice
@@ -66,17 +80,55 @@ export function TradeForm({
     }
   };
 
-  // Refetch price periodically
+  // Refetch price periodically. A failed refresh keeps the last quote and
+  // marks it delayed instead of clearing the form.
   useEffect(() => {
     const interval = setInterval(async () => {
-      const response = await fetch("/api/btc-price");
-      const data = await response.json();
-      if (data.bitcoin?.usd) setBtcPrice(data.bitcoin.usd);
+      try {
+        const response = await fetch("/api/btc-price", { cache: "no-store" });
+        const data = await response.json();
+        const usd = data?.bitcoin?.usd;
+        const status = data?.quote?.status;
+        if (isQuoteStatus(status)) {
+          if (status === "unavailable") {
+            setBtcPrice(null);
+          } else if (typeof usd === "number" && usd > 0) {
+            setBtcPrice(usd);
+          }
+          setQuoteStatus(status);
+          return;
+        }
+        if (typeof usd === "number" && usd > 0) {
+          setBtcPrice(usd);
+        }
+        setQuoteStatus((current) =>
+          current === "fresh" ? "stale" : current
+        );
+      } catch (error) {
+        console.error("Client-side error fetching BTC price:", error);
+        setQuoteStatus((current) =>
+          current === "unavailable" ? "unavailable" : "stale"
+        );
+      }
     }, 10000);
     return () => clearInterval(interval);
   }, []);
 
+  const delayLabel = quoteDelayLabel(quoteStatus);
+  const quoteReady = quoteStatus === "fresh" && btcPrice != null && btcPrice > 0;
+  const priceText =
+    btcPrice == null
+      ? "—"
+      : `$${btcPrice.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`;
+
   function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!quoteReady) {
+      toast.error("Trading is paused until a live BTC quote returns.");
+      return;
+    }
     startTransition(async () => {
       const payload = {
         tradeType,
@@ -108,6 +160,19 @@ export function TradeForm({
         </Tabs>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <span
+            className={cn(
+              "text-sm font-medium tabular-nums",
+              delayLabel && "text-muted-foreground"
+            )}
+          >
+            {priceText}
+          </span>
+          {delayLabel ? (
+            <Badge variant="outline">{delayLabel}</Badge>
+          ) : null}
+        </div>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           {/* --- SPEND INPUT --- */}
           <div className="space-y-2">
@@ -164,14 +229,21 @@ export function TradeForm({
             type="submit"
             className={cn(
               "w-full text-lg font-semibold",
-              tradeType === "BUY"
-                ? "bg-[--buy] text-[--buy-foreground] hover:bg-[--buy]/90"
-                : "bg-[--sell] text-[--sell-foreground] hover:bg-[--sell]/90"
+              quoteReady
+                ? tradeType === "BUY"
+                  ? "bg-[--buy] text-[--buy-foreground] hover:bg-[--buy]/90"
+                  : "bg-[--sell] text-[--sell-foreground] hover:bg-[--sell]/90"
+                : "bg-muted text-muted-foreground hover:bg-muted"
             )}
-            disabled={isPending}
+            disabled={isPending || !quoteReady}
           >
             {isPending ? "Processing..." : `${tradeType} BTC`}
           </Button>
+          {delayLabel ? (
+            <p className="text-xs text-center text-muted-foreground">
+              Buying and selling stay paused until a live quote returns.
+            </p>
+          ) : null}
         </form>
       </CardContent>
     </Card>

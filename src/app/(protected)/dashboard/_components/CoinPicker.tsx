@@ -121,6 +121,7 @@ export function CoinPicker({
                 <button
                   key={id}
                   type="button"
+                  aria-label={`${row.symbol} ${row.name}`}
                   aria-pressed={selected}
                   className={cn(
                     "flex w-full items-center justify-between rounded-lg p-2.5 text-left",

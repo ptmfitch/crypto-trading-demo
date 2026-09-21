@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
@@ -160,16 +159,7 @@ export function TradeForm({
             </div>
           </div>
 
-          <Button
-            type="submit"
-            className={cn(
-              "w-full text-lg font-semibold",
-              tradeType === "BUY"
-                ? "bg-[--buy] text-[--buy-foreground] hover:bg-[--buy]/90"
-                : "bg-[--sell] text-[--sell-foreground] hover:bg-[--sell]/90"
-            )}
-            disabled={isPending}
-          >
+          <Button type="submit" className="w-full" disabled={isPending}>
             {isPending ? "Processing..." : `${tradeType} BTC`}
           </Button>
         </form>

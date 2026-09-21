@@ -13,6 +13,7 @@ import {
 import prisma from "@/lib/prisma";
 import { Trade } from "@prisma/client";
 import { TrendingDown, TrendingUp } from "lucide-react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   PnlDataPoint,
@@ -167,8 +168,20 @@ export default async function ProfilePage() {
               <TableBody>
                 {trades.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center h-24">
-                      You haven&apos;t made any trades yet.
+                    <TableCell colSpan={5} className="h-32">
+                      <div className="flex flex-col items-center justify-center gap-2 text-center">
+                        <p className="font-medium">No trades yet</p>
+                        <p className="text-sm text-muted-foreground">
+                          Your buy and sell history will appear here after your
+                          first order.
+                        </p>
+                        <Link
+                          href="/dashboard"
+                          className="text-sm font-medium text-primary hover:underline"
+                        >
+                          Place your first trade
+                        </Link>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (

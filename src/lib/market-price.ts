@@ -50,17 +50,47 @@ export function failAllowlistUpstream(): Record<AssetId, UpstreamQuote> {
 export function resolveMarketQuotes(input: {
   now: number;
   cached: Partial<Record<AssetId, CachedQuote | null>>;
-  upstream: Record<AssetId, UpstreamQuote> | null;
+  upstream: Partial<Record<AssetId, UpstreamQuote>> | null;
 }): Record<AssetId, ResolvedQuote> {
   const quotes = {} as Record<AssetId, ResolvedQuote>;
   for (const id of ASSET_IDS) {
     quotes[id] = resolveBtcQuote({
       now: input.now,
       cached: input.cached[id] ?? null,
-      upstream: input.upstream ? input.upstream[id] : null,
+      upstream: input.upstream?.[id] ?? null,
     });
   }
   return quotes;
+}
+
+/**
+ * A failed group refresh must not stale a coin that is still inside the TTL.
+ * `forceFailure` is the fault-injection path and still pauses every coin.
+ */
+export function resolveRefreshedQuotes(input: {
+  now: number;
+  cached: Partial<Record<AssetId, CachedQuote | null>>;
+  fetched: Record<AssetId, UpstreamQuote>;
+  forceFailure: boolean;
+}): Record<AssetId, ResolvedQuote> {
+  const upstream: Partial<Record<AssetId, UpstreamQuote>> = {};
+  for (const id of ASSET_IDS) {
+    const quote = input.fetched[id];
+    if (!input.forceFailure && !quote.ok) {
+      const cachedOnly = resolveBtcQuote({
+        now: input.now,
+        cached: input.cached[id] ?? null,
+        upstream: null,
+      });
+      if (cachedOnly.status === "fresh") continue;
+    }
+    upstream[id] = quote;
+  }
+  return resolveMarketQuotes({
+    now: input.now,
+    cached: input.cached,
+    upstream,
+  });
 }
 
 function readCachedQuote(value: unknown): CachedQuote | null {

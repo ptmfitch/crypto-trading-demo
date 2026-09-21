@@ -8,6 +8,7 @@ import {
   marketCacheFile,
   parseAllowlistPrice,
   resolveMarketQuotes,
+  resolveRefreshedQuotes,
 } from "./market-price.ts";
 
 const NOW = 1_700_000_000_000;
@@ -103,5 +104,63 @@ describe("market quote cache", () => {
     assert.equal(quotes.ethereum.status, "fresh");
     assert.equal(quotes.ethereum.usd, 3420);
     assert.equal(quotes.solana.status, "stale");
+  });
+
+  it("keeps an in-TTL quote fresh when a sibling refresh fails", () => {
+    const quotes = resolveRefreshedQuotes({
+      now: NOW,
+      cached: {
+        bitcoin: { usd: 64000, usd24hChange: 1, fetchedAt: NOW - 5_000 },
+        ethereum: { usd: 3000, usd24hChange: null, fetchedAt: NOW - FRESH_TTL_MS },
+      },
+      fetched: {
+        bitcoin: { ok: false },
+        ethereum: { ok: false },
+        solana: { ok: false },
+      },
+      forceFailure: false,
+    });
+    assert.equal(quotes.bitcoin.status, "fresh");
+    assert.equal(quotes.bitcoin.usd, 64000);
+    assert.equal(quotes.bitcoin.nextCache, null);
+    assert.equal(quotes.ethereum.status, "stale");
+    assert.equal(quotes.ethereum.usd, 3000);
+    assert.equal(quotes.solana.status, "unavailable");
+  });
+
+  it("stores a successful price when a sibling refresh fails", () => {
+    const quotes = resolveRefreshedQuotes({
+      now: NOW,
+      cached: {
+        bitcoin: { usd: 64000, usd24hChange: null, fetchedAt: NOW - 5_000 },
+      },
+      fetched: {
+        bitcoin: { ok: true, usd: 65000, usd24hChange: 0.2 },
+        ethereum: { ok: false },
+        solana: { ok: false },
+      },
+      forceFailure: false,
+    });
+    assert.equal(quotes.bitcoin.status, "fresh");
+    assert.equal(quotes.bitcoin.usd, 65000);
+    assert.equal(quotes.ethereum.status, "unavailable");
+    assert.equal(quotes.solana.status, "unavailable");
+  });
+
+  it("still pauses every in-TTL quote when the refresh failure is forced", () => {
+    const quotes = resolveRefreshedQuotes({
+      now: NOW,
+      cached: {
+        bitcoin: { usd: 64000, usd24hChange: null, fetchedAt: NOW - 5_000 },
+      },
+      fetched: {
+        bitcoin: { ok: false },
+        ethereum: { ok: false },
+        solana: { ok: false },
+      },
+      forceFailure: true,
+    });
+    assert.equal(quotes.bitcoin.status, "stale");
+    assert.equal(quotes.bitcoin.usd, 64000);
   });
 });

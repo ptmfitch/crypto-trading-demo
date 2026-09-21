@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import { ASSET_IDS } from "@/lib/assets";
 import { getMarketQuotes } from "@/lib/btc-market";
 import { NextResponse } from "next/server";
@@ -5,6 +6,11 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const quotes = await getMarketQuotes();
   return NextResponse.json({
     quotes: Object.fromEntries(

@@ -14,6 +14,7 @@ import {
   marketCacheFile,
   parseAllowlistPrice,
   resolveMarketQuotes,
+  resolveRefreshedQuotes,
 } from "@/lib/market-price";
 
 const CHART_URL =
@@ -120,16 +121,19 @@ function stripAll(
 export async function getMarketQuotes(): Promise<Record<AssetId, AssetQuote>> {
   const now = Date.now();
   const cached = readPriceCache();
+  const blocked = upstreamBlocked();
   const cachedQuotes = resolveMarketQuotes({ now, cached, upstream: null });
-  const allFresh = ASSET_IDS.every((id) => cachedQuotes[id].status === "fresh");
-  if (!upstreamBlocked() && allFresh) {
+  if (!blocked && ASSET_IDS.every((id) => cachedQuotes[id].status === "fresh")) {
     return stripAll(cachedQuotes);
   }
 
-  const upstream = upstreamBlocked()
-    ? failAllowlistUpstream()
-    : await fetchAllowlistPrices();
-  const resolved = resolveMarketQuotes({ now, cached, upstream });
+  const fetched = blocked ? failAllowlistUpstream() : await fetchAllowlistPrices();
+  const resolved = resolveRefreshedQuotes({
+    now,
+    cached,
+    fetched,
+    forceFailure: blocked,
+  });
   const merged: Partial<Record<AssetId, CachedQuote>> = { ...cached };
   let changed = false;
   for (const id of ASSET_IDS) {

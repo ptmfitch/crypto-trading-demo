@@ -1,11 +1,25 @@
 #!/usr/bin/env node
 // Drive a verification TradeSim instance through system Chrome's DevTools port.
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-const CHROME =
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+function resolveChrome() {
+  const candidates = [
+    process.env.CHROME_PATH,
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/google-chrome",
+    "/usr/local/bin/google-chrome",
+  ];
+  for (const candidate of candidates) {
+    if (candidate && existsSync(candidate)) return candidate;
+  }
+  throw new Error(
+    "Chrome was not found. Set CHROME_PATH to the browser binary."
+  );
+}
 const STATE_DIR = process.env.TRADESIM_VERIFY_STATE_DIR || "/tmp/tradesim-verify";
 
 function usage() {
@@ -189,6 +203,9 @@ const FIND_SCRIPT = `async (request) => {
     element.form.requestSubmit(element);
     return { action: "submit", name: accessibleName(element) };
   }
+  element.dispatchEvent(
+    new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 })
+  );
   element.click();
   return { action: "click", name: accessibleName(element) };
 }`;
@@ -216,7 +233,7 @@ async function start(port) {
   const userDataDir = `${STATE_DIR}/chrome-${port}`;
   await mkdir(userDataDir, { recursive: true });
   const chrome = spawn(
-    CHROME,
+    resolveChrome(),
     [
       "--headless=new",
       "--disable-gpu",

@@ -43,4 +43,5 @@ Each feature file starts with an H1 title and one paragraph describing the user-
 - [Register](./register.md) covers creating an account, validation, and the wallet row it writes.
 - [Login](./login.md) covers email and password sign-in onto the dashboard.
 - [Buy BTC](./buy-btc.md) covers a cash purchase from the dashboard and the updated balances.
+- [Order review](./order-review.md) covers the inline review, Edit, and confirm for buy and sell.
 - [Profile](./profile.md) covers the performance report and trade history.

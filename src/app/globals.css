@@ -78,6 +78,10 @@
   --sidebar-ring: oklch(0.708 0 0);
   --chart-positive: 142 76% 36%;
   --chart-negative: 0 84% 60%;
+  --buy: 142.1 76.2% 36.3%;
+  --buy-foreground: 355.7 100% 97.3%;
+  --sell: 0 84.2% 60.2%;
+  --sell-foreground: 355.7 100% 97.3%;
 }
 
 .dark {
@@ -114,6 +118,10 @@
   --sidebar-ring: oklch(0.556 0 0);
   --chart-positive: 142 60% 46%;
   --chart-negative: 0 72% 55%;
+  --buy: 142.1 70.2% 46.3%;
+  --buy-foreground: 355.7 100% 97.3%;
+  --sell: 0 72.2% 50.6%;
+  --sell-foreground: 355.7 100% 97.3%;
 }
 
 @layer base {

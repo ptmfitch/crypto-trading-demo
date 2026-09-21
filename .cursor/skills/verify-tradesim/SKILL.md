@@ -33,7 +33,7 @@ It passes only when all of these are true:
 
 - The state file `/tmp/tradesim-verify/4173.env` exists.
 - The recorded pid is alive.
-- That pid is the listener on the recorded port.
+- That pid is the listener on the recorded port. When `lsof` cannot see the socket, the helper matches the `LISTEN` inode in `/proc/net/tcp` to the process that owns it.
 - The sqlite file exists.
 - The origin returns the landing text `Welcome to TradeSim`.
 
@@ -41,7 +41,7 @@ Do not drive an instance that fails doctor. Do not attach Playwright to `http://
 
 ## Drive
 
-Drive the browser with `.cursor/skills/verify-tradesim/scripts/drive.mjs`. It launches headless system Chrome against the verification origin. Start it after doctor passes, and stop it before cleanup.
+Drive the browser with `.cursor/skills/verify-tradesim/scripts/drive.mjs`. It launches headless system Chrome against the verification origin. The binary is `CHROME_PATH`, then the macOS Chrome app, then `google-chrome` on Linux. Start it after doctor passes, and stop it before cleanup.
 
 ```bash
 node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 start
@@ -54,14 +54,14 @@ node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 screenshot --o
 node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 stop
 ```
 
-`click` follows links by URL and submits `type="submit"` buttons with `requestSubmit`, so React forms and Next routes both run. `fill` sets the textbox through the native value setter and dispatches `input`. `wait` polls visible text. Drive one feature file at a time from `features/`.
+`click` follows links by URL and submits `type="submit"` buttons with `requestSubmit`, so React forms and Next routes both run. Other clicks dispatch `mousedown` and then `click`, because tab triggers switch on mousedown. `fill` sets the textbox through the native value setter and dispatches `input`. `wait` polls visible text. Drive one feature file at a time from `features/`.
 
 Stable handles:
 
 - Landing heading: `Welcome to TradeSim`. Links: `Login`, `Create Account`.
 - Register card text: `Create an Account`. Textboxes: `Name`, `Email`, `Password`. Submit button: `Create Account`. Alternate link: `Login`.
 - Login card text: `Welcome Back`. Textboxes: `Email`, `Password`. Submit button: `Login`. When `DEV_LOGIN=true`, combobox accessible name `Test account`, button `Continue as this account`.
-- Dashboard heading: `Welcome Back, <name>!`. Stat titles: `Portfolio Value`, `Total P&L`, `Live BTC Price`, `Total Trades`. Trade tabs: `Buy`, `Sell`. Amount field: the number input under the visible label `You Pay` (placeholder `0.00`; the label is not wired to the input). Submit button: `BUY BTC` or `SELL BTC`.
+- Dashboard heading: `Welcome Back, <name>!`. Stat titles: `Portfolio Value`, `Total P&L`, `Live BTC Price`, `Total Trades`. Trade tabs: `Buy`, `Sell`. Amount field: textbox `You Pay` (placeholder `0.00`). Amount step button: `Review buy` or `Review sell`. Review step shows `Spend`, `Receive`, `Price`, and `Live`, with ghost button `Edit` and submit button `Confirm buy` or `Confirm sell`. `Edit` returns to the amount and keeps the typed value. Only `Confirm buy` or `Confirm sell` calls the trade.
 - Header links on protected pages: `TradeSim`, `Dashboard`, `Profile`, button `Logout`.
 - Profile heading: `Performance Report`. Section heading: `Trade History`.
 

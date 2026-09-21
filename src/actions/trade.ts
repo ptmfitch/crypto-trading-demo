@@ -12,6 +12,23 @@ const TradeSchema = z.object({
   asset: z.enum(["USDT", "BTC"]),
 });
 
+function tradeSuccessMessage(
+  tradeType: "BUY" | "SELL",
+  btcDisplay: Prisma.Decimal,
+  usdtDisplay: Prisma.Decimal
+) {
+  switch (tradeType) {
+    case "BUY":
+      return `Bought ≈ ${btcDisplay} BTC with $${usdtDisplay}`;
+    case "SELL":
+      return `Sold ≈ ${btcDisplay} BTC for $${usdtDisplay}`;
+    default: {
+      const unreachable: never = tradeType;
+      throw new Error(unreachable);
+    }
+  }
+}
+
 async function getLiveBtcPrice() {
   const response = await fetch(
     "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
@@ -93,9 +110,7 @@ export async function executeTrade(values: z.infer<typeof TradeSchema>) {
       const usdtDisplay = usdtAmount.toDP(2);
 
       return {
-        message: `Successfully ${
-          tradeType === "BUY" ? "bought" : "sold"
-        } ${btcDisplay} BTC for $${usdtDisplay}`,
+        message: tradeSuccessMessage(tradeType, btcDisplay, usdtDisplay),
       };
     });
 

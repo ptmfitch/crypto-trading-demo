@@ -1,13 +1,22 @@
 "use client";
 
 import { executeTrade } from "@/actions/trade";
+import { CoinPicker, type PickerQuote } from "./CoinPicker";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  ASSETS,
+  ASSET_IDS,
+  isAssetId,
+  QUOTE_SYMBOL,
+  type AssetId,
+} from "@/lib/assets";
+import {
   quoteDelayLabel,
+  TRADE_PAUSED_ERROR,
   type BtcQuoteStatus,
 } from "@/lib/btc-quote";
 import { cn } from "@/lib/utils";
@@ -24,27 +33,54 @@ const formSchema = z.object({
 });
 
 interface TradeFormProps {
-  initialBtcPrice: number | null;
-  quoteStatus: BtcQuoteStatus;
+  initialQuotes: Record<AssetId, PickerQuote>;
   usdtBalance: number;
-  btcBalance: number;
+  holdings: Record<AssetId, number>;
 }
 
 function isQuoteStatus(value: unknown): value is BtcQuoteStatus {
   return value === "fresh" || value === "stale" || value === "unavailable";
 }
 
+function readQuotes(payload: unknown): Record<AssetId, PickerQuote> | null {
+  if (!payload || typeof payload !== "object" || !("quotes" in payload)) {
+    return null;
+  }
+  const quotes = (payload as { quotes?: unknown }).quotes;
+  if (!quotes || typeof quotes !== "object") return null;
+  const next = {} as Record<AssetId, PickerQuote>;
+  for (const id of ASSET_IDS) {
+    const row = (quotes as Record<string, unknown>)[id];
+    if (!row || typeof row !== "object") return null;
+    const record = row as {
+      usd?: unknown;
+      usd_24h_change?: unknown;
+      status?: unknown;
+    };
+    if (!isQuoteStatus(record.status)) return null;
+    next[id] = {
+      usd: typeof record.usd === "number" ? record.usd : null,
+      usd24hChange:
+        typeof record.usd_24h_change === "number" ? record.usd_24h_change : null,
+      status: record.status,
+    };
+  }
+  return next;
+}
+
+function floorTo(value: number, digits: number) {
+  const factor = 10 ** digits;
+  return Math.floor(value * factor) / factor;
+}
+
 export function TradeForm({
-  initialBtcPrice,
-  quoteStatus: initialQuoteStatus,
+  initialQuotes,
   usdtBalance,
-  btcBalance,
+  holdings,
 }: TradeFormProps) {
-  const [btcPrice, setBtcPrice] = useState<number | null>(initialBtcPrice);
-  const [quoteStatus, setQuoteStatus] = useState<BtcQuoteStatus>(
-    initialQuoteStatus
-  );
-  const [tradeType, setTradeType] = useState<"BUY" | "SELL">("BUY");
+  const [quotes, setQuotes] = useState(initialQuotes);
+  const [assetId, setAssetId] = useState<AssetId>("bitcoin");
+  const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [isPending, startTransition] = useTransition();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -52,90 +88,89 @@ export function TradeForm({
     defaultValues: { amount: 0 },
   });
   const amount = form.watch("amount");
+  const asset = ASSETS[assetId];
+  const quote = quotes[assetId];
+  const price = quote?.usd ?? null;
+  const holding = holdings[assetId] ?? 0;
+  const spendSymbol = side === "BUY" ? QUOTE_SYMBOL : asset.symbol;
+  const receiveSymbol = side === "BUY" ? asset.symbol : QUOTE_SYMBOL;
+  const spendBalance = side === "BUY" ? usdtBalance : holding;
+  const spendDigits = side === "BUY" ? 2 : asset.decimals;
+  const receiveDigits = side === "BUY" ? asset.decimals : 2;
 
-  // Determine which asset is being spent and which is being received
-  const spendAsset: "USDT" | "BTC" = tradeType === "BUY" ? "USDT" : "BTC";
-  const receiveAsset = tradeType === "BUY" ? "BTC" : "USDT";
-  const spendBalance = tradeType === "BUY" ? usdtBalance : btcBalance;
-
-  // Calculate the received amount based on the input amount
   const receiveAmount =
-    amount > 0 && btcPrice != null && btcPrice > 0
-      ? spendAsset === "USDT"
-        ? amount / btcPrice
-        : amount * btcPrice
+    amount > 0 && price != null && price > 0
+      ? side === "BUY"
+        ? amount / price
+        : amount * price
       : 0;
 
-  // Function to handle quick percentage clicks
   const handlePercentageClick = (percentage: number) => {
-    if (tradeType === "SELL" && percentage === 1) {
-      // For 100% sell, use the exact btcBalance
-      form.setValue("amount", parseFloat(btcBalance.toFixed(8)));
-    } else {
-      const value = spendBalance * percentage;
-      form.setValue(
-        "amount",
-        parseFloat(value.toFixed(spendAsset === "USDT" ? 2 : 8))
-      );
+    // 100% must spend the exact balance. Rounding the product can exceed it.
+    if (percentage === 1) {
+      form.setValue("amount", spendBalance);
+      return;
     }
+    form.setValue("amount", floorTo(spendBalance * percentage, spendDigits));
   };
 
-  // Refetch price periodically. A failed refresh keeps the last quote and
-  // marks it delayed instead of clearing the form.
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch("/api/btc-price", { cache: "no-store" });
-        const data = await response.json();
-        const usd = data?.bitcoin?.usd;
-        const status = data?.quote?.status;
-        if (isQuoteStatus(status)) {
-          if (status === "unavailable") {
-            setBtcPrice(null);
-          } else if (typeof usd === "number" && usd > 0) {
-            setBtcPrice(usd);
-          }
-          setQuoteStatus(status);
+        const response = await fetch("/api/markets", { cache: "no-store" });
+        const next = readQuotes(await response.json());
+        if (!next) {
+          setQuotes((current) => {
+            const stale = { ...current };
+            for (const id of ASSET_IDS) {
+              if (stale[id].status === "fresh") {
+                stale[id] = { ...stale[id], status: "stale" };
+              }
+            }
+            return stale;
+          });
           return;
         }
-        if (typeof usd === "number" && usd > 0) {
-          setBtcPrice(usd);
-        }
-        setQuoteStatus((current) =>
-          current === "fresh" ? "stale" : current
-        );
+        setQuotes(next);
       } catch (error) {
-        console.error("Client-side error fetching BTC price:", error);
-        setQuoteStatus((current) =>
-          current === "unavailable" ? "unavailable" : "stale"
-        );
+        console.error("Client-side error fetching market prices:", error);
+        setQuotes((current) => {
+          const stale = { ...current };
+          for (const id of ASSET_IDS) {
+            stale[id] = {
+              ...stale[id],
+              status: stale[id].status === "unavailable" ? "unavailable" : "stale",
+            };
+          }
+          return stale;
+        });
       }
     }, 10000);
     return () => clearInterval(interval);
   }, []);
 
-  const delayLabel = quoteDelayLabel(quoteStatus);
-  const quoteReady = quoteStatus === "fresh" && btcPrice != null && btcPrice > 0;
+  const delayLabel = quoteDelayLabel(quote?.status ?? "unavailable");
+  const quoteReady =
+    quote?.status === "fresh" && price != null && price > 0;
   const priceText =
-    btcPrice == null
+    price == null
       ? "—"
-      : `$${btcPrice.toLocaleString(undefined, {
+      : `$${price.toLocaleString(undefined, {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         })}`;
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     if (!quoteReady) {
-      toast.error("Trading is paused until a live BTC quote returns.");
+      toast.error(TRADE_PAUSED_ERROR);
       return;
     }
     startTransition(async () => {
-      const payload = {
-        tradeType,
+      const result = await executeTrade({
+        side,
         amount: values.amount,
-        asset: spendAsset,
-      };
-      const result = await executeTrade(payload);
+        assetId,
+      });
       if (result.success) {
         toast.success(result.success);
         form.reset({ amount: 0 });
@@ -149,8 +184,10 @@ export function TradeForm({
     <Card>
       <CardHeader>
         <Tabs
-          value={tradeType}
-          onValueChange={(value) => setTradeType(value as "BUY" | "SELL")}
+          value={side}
+          onValueChange={(value) => {
+            if (value === "BUY" || value === "SELL") setSide(value);
+          }}
           className="w-full"
         >
           <TabsList className="grid w-full grid-cols-2">
@@ -160,21 +197,27 @@ export function TradeForm({
         </Tabs>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <span
-            className={cn(
-              "text-sm font-medium tabular-nums",
-              delayLabel && "text-muted-foreground"
-            )}
-          >
-            {priceText}
-          </span>
-          {delayLabel ? (
-            <Badge variant="outline">{delayLabel}</Badge>
-          ) : null}
-        </div>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          {/* --- SPEND INPUT --- */}
+          <CoinPicker
+            assetId={assetId}
+            quotes={quotes}
+            onAssetId={(next) => {
+              if (isAssetId(next)) setAssetId(next);
+            }}
+          />
+          <div className="flex items-center justify-between gap-3">
+            <span
+              className={cn(
+                "text-sm font-medium tabular-nums",
+                delayLabel && "text-muted-foreground"
+              )}
+            >
+              {priceText}
+            </span>
+            {delayLabel ? (
+              <Badge variant="outline">{delayLabel}</Badge>
+            ) : null}
+          </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">You Pay</label>
             <div className="relative">
@@ -185,42 +228,40 @@ export function TradeForm({
                 {...form.register("amount")}
                 placeholder="0.00"
               />
-              <span className="absolute inset-y-0 right-4 flex items-center text-muted-foreground font-semibold">
-                {spendAsset}
+              <span className="absolute inset-y-0 right-4 flex items-center font-semibold text-muted-foreground">
+                {spendSymbol}
               </span>
             </div>
-            <div className="flex justify-between items-center">
+            <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
-                Available: {spendBalance.toFixed(spendAsset === "USDT" ? 2 : 6)}{" "}
-                {spendAsset}
+                Available: {spendBalance.toFixed(spendDigits)} {spendSymbol}
               </span>
               <div className="space-x-1">
-                {[25, 50, 100].map((p) => (
+                {[25, 50, 100].map((percent) => (
                   <Button
-                    key={p}
+                    key={percent}
                     type="button"
                     size="sm"
                     variant="ghost"
-                    onClick={() => handlePercentageClick(p / 1000)}
+                    onClick={() => handlePercentageClick(percent / 100)}
                   >
-                    {p}%
+                    {percent}%
                   </Button>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* --- RECEIVE DISPLAY --- */}
           <div className="space-y-2">
             <label className="text-sm font-medium">You Receive</label>
             <div className="relative">
               <Input
                 readOnly
-                className="pr-16 text-lg bg-muted/50"
-                value={receiveAmount.toFixed(2)}
+                className="bg-muted/50 pr-16 text-lg"
+                value={receiveAmount.toFixed(receiveDigits)}
               />
-              <span className="absolute inset-y-0 right-4 flex items-center text-muted-foreground font-semibold">
-                {receiveAsset}
+              <span className="absolute inset-y-0 right-4 flex items-center font-semibold text-muted-foreground">
+                {receiveSymbol}
               </span>
             </div>
           </div>
@@ -230,17 +271,17 @@ export function TradeForm({
             className={cn(
               "w-full text-lg font-semibold",
               quoteReady
-                ? tradeType === "BUY"
+                ? side === "BUY"
                   ? "bg-[--buy] text-[--buy-foreground] hover:bg-[--buy]/90"
                   : "bg-[--sell] text-[--sell-foreground] hover:bg-[--sell]/90"
                 : "bg-muted text-muted-foreground hover:bg-muted"
             )}
             disabled={isPending || !quoteReady}
           >
-            {isPending ? "Processing..." : `${tradeType} BTC`}
+            {isPending ? "Processing..." : `${side} ${asset.symbol}`}
           </Button>
           {delayLabel ? (
-            <p className="text-xs text-center text-muted-foreground">
+            <p className="text-center text-xs text-muted-foreground">
               Buying and selling stay paused until a live quote returns.
             </p>
           ) : null}

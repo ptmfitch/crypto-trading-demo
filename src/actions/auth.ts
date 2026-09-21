@@ -1,5 +1,6 @@
 "use server";
 
+import { seedHoldings } from "@/lib/holding-migration";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
@@ -35,6 +36,9 @@ export async function registerUser(values: z.infer<typeof RegisterSchema>) {
         data: {
           userId: newUser.id,
         },
+      });
+      await tx.holding.createMany({
+        data: seedHoldings(newUser.id),
       });
     });
 

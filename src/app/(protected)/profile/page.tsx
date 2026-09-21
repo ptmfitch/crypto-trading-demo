@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ASSETS, isAssetId } from "@/lib/assets";
 import prisma from "@/lib/prisma";
 import { Trade } from "@prisma/client";
 import { TrendingDown, TrendingUp } from "lucide-react";
@@ -22,30 +23,52 @@ import {
 
 const INITIAL_CAPITAL = 10000;
 
+function applyTradeSide(
+  side: string,
+  cash: number,
+  base: number,
+  quote: number,
+  held: number
+): { cash: number; held: number } | null {
+  switch (side) {
+    case "BUY":
+      return { cash: cash - quote, held: held + base };
+    case "SELL":
+      return { cash: cash + quote, held: held - base };
+    default:
+      return null;
+  }
+}
+
 function calculatePnlHistory(trades: Trade[]): PnlDataPoint[] {
   if (!trades || trades.length === 0) {
     return [];
   }
-  let currentUsdt = INITIAL_CAPITAL;
-  let currentBtc = 0;
-  const pnlHistory: PnlDataPoint[] = trades.map((trade) => {
-    const usdtAmount = Number(trade.usdtAmount);
-    const btcAmount = Number(trade.btcAmount);
-    if (trade.type === "BUY") {
-      currentUsdt -= usdtAmount;
-      currentBtc += btcAmount;
-    } else {
-      currentUsdt += usdtAmount;
-      currentBtc -= btcAmount;
+  let cash = INITIAL_CAPITAL;
+  const balances = new Map<string, number>();
+  const marks = new Map<string, number>();
+  const pnlHistory: PnlDataPoint[] = [];
+  for (const trade of trades) {
+    const next = applyTradeSide(
+      trade.side,
+      cash,
+      Number(trade.baseAmount),
+      Number(trade.quoteAmount),
+      balances.get(trade.assetId) ?? 0
+    );
+    if (!next) continue;
+    cash = next.cash;
+    balances.set(trade.assetId, next.held);
+    marks.set(trade.assetId, Number(trade.priceAtTrade));
+    let portfolioValue = cash;
+    for (const [assetId, amount] of balances) {
+      portfolioValue += amount * (marks.get(assetId) ?? 0);
     }
-    const portfolioValue =
-      currentUsdt + currentBtc * Number(trade.priceAtTrade);
-    const pnl = portfolioValue - INITIAL_CAPITAL;
-    return {
+    pnlHistory.push({
       date: trade.timestamp.toISOString(),
-      pnl: parseFloat(pnl.toFixed(2)),
-    };
-  });
+      pnl: parseFloat((portfolioValue - INITIAL_CAPITAL).toFixed(2)),
+    });
+  }
   return pnlHistory;
 }
 
@@ -160,15 +183,16 @@ export default async function ProfilePage() {
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Price (USD)</TableHead>
-                  <TableHead>Amount (BTC)</TableHead>
-                  <TableHead className="text-right">Total (USD)</TableHead>
+                  <TableHead>Asset</TableHead>
+                  <TableHead>Price (USDT)</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead className="text-right">Total (USDT)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {trades.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-32">
+                    <TableCell colSpan={6} className="h-32">
                       <div className="flex flex-col items-center justify-center gap-2 text-center">
                         <p className="font-medium">No trades yet</p>
                         <p className="text-sm text-muted-foreground">
@@ -191,20 +215,29 @@ export default async function ProfilePage() {
                       <TableCell>
                         <Badge
                           variant={
-                            trade.type === "BUY" ? "default" : "destructive"
+                            trade.side === "BUY" ? "default" : "destructive"
                           }
                         >
-                          {trade.type}
+                          {trade.side}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {isAssetId(trade.assetId)
+                          ? ASSETS[trade.assetId].symbol
+                          : trade.assetId}
                       </TableCell>
                       <TableCell>
                         ${Number(trade.priceAtTrade).toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        {Number(trade.usdtAmount).toFixed(8)}
+                        {Number(trade.baseAmount).toFixed(
+                          isAssetId(trade.assetId)
+                            ? ASSETS[trade.assetId].decimals
+                            : 8
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
-                        ${Number(trade.btcAmount).toFixed(2)}
+                        ${Number(trade.quoteAmount).toFixed(2)}
                       </TableCell>
                     </TableRow>
                   ))

@@ -2,15 +2,20 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { ASSET_IDS, type AssetId } from "@/lib/assets";
 import {
   type CachedQuote,
   type ResolvedQuote,
-  resolveBtcQuote,
-  type UpstreamQuote,
 } from "@/lib/btc-quote";
+import {
+  allowlistPriceUrl,
+  cachedQuotesFromFile,
+  failAllowlistUpstream,
+  marketCacheFile,
+  parseAllowlistPrice,
+  resolveMarketQuotes,
+} from "@/lib/market-price";
 
-const PRICE_URL =
-  "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true";
 const CHART_URL =
   "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=";
 const CHART_FRESH_TTL_MS = 900_000;
@@ -26,6 +31,8 @@ type ChartCacheFile = Partial<
 >;
 
 export type BtcQuote = Omit<ResolvedQuote, "nextCache">;
+
+export type AssetQuote = BtcQuote;
 
 export type BtcChart = {
   status: BtcQuote["status"];
@@ -74,19 +81,8 @@ function writeJson(file: string, value: unknown) {
   fs.renameSync(tmp, file);
 }
 
-function readPriceCache(): CachedQuote | null {
-  const parsed = readJson(priceCachePath());
-  if (!parsed || typeof parsed !== "object") return null;
-  const row = parsed as Partial<CachedQuote>;
-  if (typeof row.usd !== "number" || typeof row.fetchedAt !== "number") {
-    return null;
-  }
-  return {
-    usd: row.usd,
-    usd24hChange:
-      typeof row.usd24hChange === "number" ? row.usd24hChange : null,
-    fetchedAt: row.fetchedAt,
-  };
+function readPriceCache(): Partial<Record<AssetId, CachedQuote>> {
+  return cachedQuotesFromFile(readJson(priceCachePath()));
 }
 
 function strip(quote: ResolvedQuote): BtcQuote {
@@ -99,44 +95,58 @@ function strip(quote: ResolvedQuote): BtcQuote {
   };
 }
 
-async function fetchCoinGeckoPrice(): Promise<UpstreamQuote> {
+async function fetchAllowlistPrices() {
   try {
-    const response = await fetch(PRICE_URL, {
+    const response = await fetch(allowlistPriceUrl(), {
       cache: "no-store",
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
-    if (!response.ok) return { ok: false };
-    const data = (await response.json()) as {
-      bitcoin?: { usd?: unknown; usd_24h_change?: unknown };
-    };
-    const usd = data.bitcoin?.usd;
-    const change = data.bitcoin?.usd_24h_change;
-    if (typeof usd !== "number") return { ok: false };
-    return {
-      ok: true,
-      usd,
-      usd24hChange: typeof change === "number" ? change : null,
-    };
+    if (!response.ok) return failAllowlistUpstream();
+    return parseAllowlistPrice(await response.json());
   } catch (error) {
-    console.error("[BTC Price] upstream failed", error);
-    return { ok: false };
+    console.error("[Market Price] upstream failed", error);
+    return failAllowlistUpstream();
   }
 }
 
-export async function getBtcQuote(): Promise<BtcQuote> {
+function stripAll(
+  quotes: Record<AssetId, ResolvedQuote>
+): Record<AssetId, AssetQuote> {
+  const stripped = {} as Record<AssetId, AssetQuote>;
+  for (const id of ASSET_IDS) stripped[id] = strip(quotes[id]);
+  return stripped;
+}
+
+export async function getMarketQuotes(): Promise<Record<AssetId, AssetQuote>> {
   const now = Date.now();
   const cached = readPriceCache();
-  const cachedQuote = resolveBtcQuote({ now, cached, upstream: null });
-  if (!upstreamBlocked() && cachedQuote.status === "fresh") {
-    return strip(cachedQuote);
+  const cachedQuotes = resolveMarketQuotes({ now, cached, upstream: null });
+  const allFresh = ASSET_IDS.every((id) => cachedQuotes[id].status === "fresh");
+  if (!upstreamBlocked() && allFresh) {
+    return stripAll(cachedQuotes);
   }
 
   const upstream = upstreamBlocked()
-    ? ({ ok: false } as const)
-    : await fetchCoinGeckoPrice();
-  const resolved = resolveBtcQuote({ now, cached, upstream });
-  if (resolved.nextCache) writeJson(priceCachePath(), resolved.nextCache);
-  return strip(resolved);
+    ? failAllowlistUpstream()
+    : await fetchAllowlistPrices();
+  const resolved = resolveMarketQuotes({ now, cached, upstream });
+  const merged: Partial<Record<AssetId, CachedQuote>> = { ...cached };
+  let changed = false;
+  for (const id of ASSET_IDS) {
+    const next = resolved[id].nextCache;
+    if (next) {
+      merged[id] = next;
+      changed = true;
+    }
+  }
+  const file = changed ? marketCacheFile(merged) : null;
+  if (file) writeJson(priceCachePath(), file);
+  return stripAll(resolved);
+}
+
+export async function getBtcQuote(): Promise<BtcQuote> {
+  const quotes = await getMarketQuotes();
+  return quotes.bitcoin;
 }
 
 export function parseChartDays(value: string | null): ChartDays | null {

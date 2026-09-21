@@ -1,8 +1,9 @@
 "use server";
 
 import { auth } from "@/auth";
+import { ASSETS, assetIdSchema, QUOTE_SYMBOL } from "@/lib/assets";
 import { assertTradableQuote } from "@/lib/btc-quote";
-import { getBtcQuote } from "@/lib/btc-market";
+import { getMarketQuotes } from "@/lib/btc-market";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -10,9 +11,22 @@ import { z } from "zod";
 
 const TradeSchema = z.object({
   amount: z.number().positive(),
-  tradeType: z.enum(["BUY", "SELL"]),
-  asset: z.enum(["USDT", "BTC"]),
+  side: z.enum(["BUY", "SELL"]),
+  assetId: assetIdSchema,
 });
+
+function verb(side: "BUY" | "SELL") {
+  switch (side) {
+    case "BUY":
+      return "bought";
+    case "SELL":
+      return "sold";
+    default: {
+      const exhaustive: never = side;
+      return exhaustive;
+    }
+  }
+}
 
 export async function executeTrade(values: z.infer<typeof TradeSchema>) {
   const session = await auth();
@@ -26,69 +40,76 @@ export async function executeTrade(values: z.infer<typeof TradeSchema>) {
     return { error: "Invalid input" };
   }
 
-  const { amount, tradeType, asset } = validatedFields.data;
+  const { amount, side, assetId } = validatedFields.data;
+  const asset = ASSETS[assetId];
 
-  const tradable = assertTradableQuote(await getBtcQuote());
+  const tradable = assertTradableQuote((await getMarketQuotes())[assetId]);
   if (!tradable.ok) {
     return { error: tradable.error };
   }
-  const liveBtcPrice = new Prisma.Decimal(tradable.usd);
+  const price = new Prisma.Decimal(tradable.usd);
 
   try {
     const result = await prisma.$transaction(async (tx) => {
       const wallet = await tx.wallet.findUnique({ where: { userId } });
       if (!wallet) throw new Error("Wallet not found.");
 
-      let usdtAmount: Prisma.Decimal;
-      let btcAmount: Prisma.Decimal;
-
-      if (asset === "USDT") {
-        usdtAmount = new Prisma.Decimal(amount);
-        btcAmount = usdtAmount.div(liveBtcPrice);
+      let baseAmount: Prisma.Decimal;
+      let quoteAmount: Prisma.Decimal;
+      if (side === "BUY") {
+        quoteAmount = new Prisma.Decimal(amount);
+        baseAmount = quoteAmount.div(price);
       } else {
-        btcAmount = new Prisma.Decimal(amount);
-        usdtAmount = btcAmount.mul(liveBtcPrice);
+        baseAmount = new Prisma.Decimal(amount);
+        quoteAmount = baseAmount.mul(price);
       }
 
-      if (tradeType === "BUY") {
-        if (wallet.usdtBalance.lt(usdtAmount))
-          throw new Error("Insufficient USDT balance.");
+      if (side === "BUY") {
+        if (wallet.usdtBalance.lt(quoteAmount)) {
+          throw new Error(`Insufficient ${QUOTE_SYMBOL} balance.`);
+        }
         await tx.wallet.update({
           where: { userId },
-          data: {
-            usdtBalance: { decrement: usdtAmount },
-            btcBalance: { increment: btcAmount },
-          },
+          data: { usdtBalance: { decrement: quoteAmount } },
+        });
+        await tx.holding.upsert({
+          where: { userId_assetId: { userId, assetId } },
+          create: { userId, assetId, amount: baseAmount },
+          update: { amount: { increment: baseAmount } },
         });
       } else {
-        if (wallet.btcBalance.lt(btcAmount))
-          throw new Error("Insufficient BTC balance.");
+        const holding = await tx.holding.findUnique({
+          where: { userId_assetId: { userId, assetId } },
+        });
+        const balance = holding?.amount ?? new Prisma.Decimal(0);
+        if (balance.lt(baseAmount)) {
+          throw new Error(`Insufficient ${asset.symbol} balance.`);
+        }
+        await tx.holding.update({
+          where: { userId_assetId: { userId, assetId } },
+          data: { amount: { decrement: baseAmount } },
+        });
         await tx.wallet.update({
           where: { userId },
-          data: {
-            usdtBalance: { increment: usdtAmount },
-            btcBalance: { decrement: btcAmount },
-          },
+          data: { usdtBalance: { increment: quoteAmount } },
         });
       }
 
       await tx.trade.create({
         data: {
           userId,
-          type: tradeType,
-          usdtAmount: usdtAmount,
-          btcAmount: btcAmount,
-          priceAtTrade: liveBtcPrice,
+          side,
+          assetId,
+          baseAmount,
+          quoteAmount,
+          priceAtTrade: price,
         },
       });
 
-      const btcDisplay = btcAmount.toDP(6);
-      const usdtDisplay = usdtAmount.toDP(2);
-
       return {
-        message: `Successfully ${
-          tradeType === "BUY" ? "bought" : "sold"
-        } ${btcDisplay} BTC for $${usdtDisplay}`,
+        message: `Successfully ${verb(side)} ${baseAmount.toDP(
+          asset.decimals
+        )} ${asset.symbol} for $${quoteAmount.toDP(2)}`,
       };
     });
 

@@ -349,7 +349,10 @@ cmd_wallet() {
   sqlite3 "$DATABASE" <<SQL
 .headers on
 .mode column
-SELECT u.email, u.name, w.usdtBalance, w.btcBalance
+SELECT u.email, u.name, w.usdtBalance,
+  COALESCE((SELECT h.amount FROM Holding h WHERE h.userId = u.id AND h.assetId = 'bitcoin'), 0) AS btcBalance,
+  COALESCE((SELECT h.amount FROM Holding h WHERE h.userId = u.id AND h.assetId = 'ethereum'), 0) AS ethBalance,
+  COALESCE((SELECT h.amount FROM Holding h WHERE h.userId = u.id AND h.assetId = 'solana'), 0) AS solBalance
 FROM User u
 JOIN Wallet w ON w.userId = u.id
 WHERE u.email = '$email_sql';

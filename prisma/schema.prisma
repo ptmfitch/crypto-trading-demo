@@ -19,6 +19,7 @@ model User {
     accounts Account[]
     sessions Session[]
     wallet   Wallet?
+    holdings Holding[]
     trades   Trade[]
 }
 
@@ -26,17 +27,29 @@ model Wallet {
     id          String  @id @default(cuid())
     userId      String  @unique
     usdtBalance Decimal @default(10000.00)
-    btcBalance  Decimal @default(0.00)
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Quote cash stays on Wallet. Base coins are holdings keyed by CoinGecko id.
+model Holding {
+    id      String  @id @default(cuid())
+    userId  String
+    assetId String
+    amount  Decimal @default(0)
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, assetId])
 }
 
 model Trade {
     id           String   @id @default(cuid())
     userId       String
-    type         String
-    btcAmount    Decimal
-    usdtAmount   Decimal
+    side         String
+    assetId      String
+    baseAmount   Decimal
+    quoteAmount  Decimal
     priceAtTrade Decimal
     timestamp    DateTime @default(now())
 

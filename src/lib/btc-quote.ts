@@ -1,7 +1,7 @@
 export const FRESH_TTL_MS = 60_000;
 
 export const TRADE_PAUSED_ERROR =
-  "Trading is paused until a live BTC quote returns.";
+  "Trading is paused until a live quote returns.";
 
 export type BtcQuoteStatus = "fresh" | "stale" | "unavailable";
 

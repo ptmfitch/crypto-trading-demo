@@ -31,7 +31,7 @@ A modern, full-stack demo trading platform for learning crypto trading, built wi
 - Secure registration and login (Next-Auth v5/Auth.js)
 - Virtual wallet with $10,000 starting balance
 - Real-time Bitcoin price from CoinGecko
-- Buy/Sell BTC with instant P&L updates
+- Buy and sell BTC, ETH, and SOL against USDT, with instant P&L updates
 - Trade history and profile page
 - Modern, responsive UI (TailwindCSS 4 + ShadCN/UI)
 

@@ -4,8 +4,10 @@ import { DollarSign, ListChecks, TrendingUp, Wallet } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { StatCard } from "@/components/StatCard";
-import { getBtcQuote } from "@/lib/btc-market";
+import { ASSET_IDS, isAssetId, type AssetId } from "@/lib/assets";
+import { getMarketQuotes, type AssetQuote } from "@/lib/btc-market";
 import { quoteDelayLabel, type BtcQuoteStatus } from "@/lib/btc-quote";
+import { ensureHoldings } from "@/lib/holdings";
 import { BtcPriceChart } from "./_components/BtcPriceChart";
 import { TradeForm } from "./_components/TradeForm";
 
@@ -16,10 +18,28 @@ function formatUsd(value: number) {
   })}`;
 }
 
-function portfolioValue(usdt: number, btc: number, usd: number | null) {
-  if (usd != null) return usdt + btc * usd;
-  if (btc === 0) return usdt;
-  return null;
+function emptyHoldings(): Record<AssetId, number> {
+  return Object.fromEntries(ASSET_IDS.map((id) => [id, 0])) as Record<
+    AssetId,
+    number
+  >;
+}
+
+function portfolioValue(
+  usdt: number,
+  holdings: Record<AssetId, number>,
+  quotes: Record<AssetId, AssetQuote>
+) {
+  let total = usdt;
+  let usedStale = false;
+  for (const id of ASSET_IDS) {
+    if (holdings[id] === 0) continue;
+    const quote = quotes[id];
+    if (quote.usd == null) return { total: null, usedStale };
+    if (quote.status === "stale") usedStale = true;
+    total += holdings[id] * quote.usd;
+  }
+  return { total, usedStale };
 }
 
 async function getDashboardData(userId: string) {
@@ -29,17 +49,23 @@ async function getDashboardData(userId: string) {
     return null;
   }
 
-  const [tradeCount, quote] = await Promise.all([
+  await ensureHoldings(userId);
+  const [tradeCount, quotes, holdingRows] = await Promise.all([
     prisma.trade.count({ where: { userId } }),
-    getBtcQuote(),
+    getMarketQuotes(),
+    prisma.holding.findMany({ where: { userId } }),
   ]);
 
-  const usdt = Number(wallet.usdtBalance);
-  const btc = Number(wallet.btcBalance);
-  const totalValue = portfolioValue(usdt, btc, quote.usd);
-  const pnl = totalValue == null ? null : totalValue - 10000;
+  const holdings = emptyHoldings();
+  for (const row of holdingRows) {
+    if (isAssetId(row.assetId)) holdings[row.assetId] = Number(row.amount);
+  }
 
-  return { wallet, tradeCount, quote, totalValue, pnl };
+  const usdt = Number(wallet.usdtBalance);
+  const { total, usedStale } = portfolioValue(usdt, holdings, quotes);
+  const pnl = total == null ? null : total - 10000;
+
+  return { wallet, holdings, tradeCount, quotes, totalValue: total, pnl, usedStale };
 }
 
 function priceStat(status: BtcQuoteStatus, usd: number | null) {
@@ -90,16 +116,17 @@ export default async function DashboardPage() {
     );
   }
 
-  const { wallet, quote, totalValue, pnl, tradeCount } = data;
+  const { wallet, holdings, quotes, totalValue, pnl, tradeCount, usedStale } =
+    data;
+  const bitcoin = quotes.bitcoin;
   const pnlColor =
     pnl == null ? "text-muted-foreground" : pnl >= 0 ? "text-green-500" : "text-red-500";
-  const price = priceStat(quote.status, quote.usd);
-  const portfolioDescription =
-    quote.status === "stale"
-      ? "Includes a delayed BTC quote"
-      : quote.status === "unavailable" && totalValue == null
-        ? "BTC value unavailable"
-        : undefined;
+  const price = priceStat(bitcoin.status, bitcoin.usd);
+  const portfolioDescription = usedStale
+    ? "Includes a delayed quote"
+    : totalValue == null
+      ? "Coin value unavailable"
+      : undefined;
 
   return (
     <main className="flex-1 bg-muted/40">
@@ -130,9 +157,7 @@ export default async function DashboardPage() {
             icon={TrendingUp}
             color={pnlColor}
             href="/profile"
-            description={
-              quote.status === "stale" ? "Includes a delayed BTC quote" : undefined
-            }
+            description={usedStale ? "Includes a delayed quote" : undefined}
           />
           <StatCard
             title="Live BTC Price"
@@ -156,10 +181,25 @@ export default async function DashboardPage() {
 
           <div className="lg:col-span-1">
             <TradeForm
-              initialBtcPrice={quote.usd}
-              quoteStatus={quote.status}
+              initialQuotes={{
+                bitcoin: {
+                  usd: quotes.bitcoin.usd,
+                  usd24hChange: quotes.bitcoin.usd24hChange,
+                  status: quotes.bitcoin.status,
+                },
+                ethereum: {
+                  usd: quotes.ethereum.usd,
+                  usd24hChange: quotes.ethereum.usd24hChange,
+                  status: quotes.ethereum.status,
+                },
+                solana: {
+                  usd: quotes.solana.usd,
+                  usd24hChange: quotes.solana.usd24hChange,
+                  status: quotes.solana.status,
+                },
+              }}
               usdtBalance={Number(wallet.usdtBalance)}
-              btcBalance={Number(wallet.btcBalance)}
+              holdings={holdings}
             />
           </div>
         </div>

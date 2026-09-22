@@ -164,6 +164,11 @@ export function TradeForm({
   const ticking = useRef(false);
   const routerRef = useRef(router);
   routerRef.current = router;
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const initialOrdersRef = useRef(initialOrders);
+  initialOrdersRef.current = initialOrders;
+  const ordersSignature = initialOrders.map((order) => order.id).join(",");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -236,6 +241,19 @@ export function TradeForm({
     return () => clearInterval(interval);
   }, []);
 
+  // router.refresh() updates initialOrders, but rows is local state. Rebuild
+  // pending rows from the server list and keep fill flashes on screen.
+  useEffect(() => {
+    setRows((current) => {
+      const flashes = current.filter((row) => row.phase === "filled");
+      const flashIds = new Set(flashes.map((row) => row.id));
+      const pending = initialOrdersRef.current
+        .filter((order) => !flashIds.has(order.id))
+        .map((order) => ({ ...order, phase: "pending" as const }));
+      return [...pending, ...flashes];
+    });
+  }, [ordersSignature]);
+
   useEffect(() => {
     if (orderMode !== "limit") return;
     let cancel = false;
@@ -281,7 +299,21 @@ export function TradeForm({
       ticking.current = true;
       try {
         const result = await tickLimitOrders();
-        if (!result.ok || result.filled.length === 0) return;
+        if (!result.ok) return;
+        if (result.filled.length === 0) {
+          const localIds = rowsRef.current
+            .filter((row) => row.phase === "pending")
+            .map((row) => row.id)
+            .sort()
+            .join(",");
+          const remoteIds = result.pending
+            .map((order) => order.id)
+            .sort()
+            .join(",");
+          // No fill notice in this tab: another session filled or canceled it.
+          if (localIds !== remoteIds) routerRef.current.refresh();
+          return;
+        }
         const notices = result.filled;
         setRows((current) => {
           const ids = new Set(notices.map((notice) => notice.id));

@@ -164,9 +164,6 @@ export function TradeForm({
   const ticking = useRef(false);
   const routerRef = useRef(router);
   routerRef.current = router;
-  const initialOrdersRef = useRef(initialOrders);
-  initialOrdersRef.current = initialOrders;
-  const ordersSignature = initialOrders.map((order) => order.id).join(",");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -240,17 +237,6 @@ export function TradeForm({
   }, []);
 
   useEffect(() => {
-    setRows((current) => {
-      const flashes = current.filter((row) => row.phase === "filled");
-      const flashIds = new Set(flashes.map((row) => row.id));
-      const pending = initialOrdersRef.current
-        .filter((order) => !flashIds.has(order.id))
-        .map((order) => ({ ...order, phase: "pending" as const }));
-      return [...pending, ...flashes];
-    });
-  }, [ordersSignature]);
-
-  useEffect(() => {
     if (orderMode !== "limit") return;
     let cancel = false;
     async function load() {
@@ -281,7 +267,7 @@ export function TradeForm({
     if (!filledKey) return;
     const timeout = setTimeout(() => {
       setRows((current) => current.filter((row) => row.phase !== "filled"));
-    }, 1800);
+    }, 2500);
     return () => clearTimeout(timeout);
   }, [filledKey]);
 
@@ -295,7 +281,7 @@ export function TradeForm({
       ticking.current = true;
       try {
         const result = await tickLimitOrders();
-        if (stopped || !result.ok || result.filled.length === 0) return;
+        if (!result.ok || result.filled.length === 0) return;
         const notices = result.filled;
         setRows((current) => {
           const ids = new Set(notices.map((notice) => notice.id));
@@ -303,7 +289,7 @@ export function TradeForm({
             ids.has(row.id) ? { ...row, phase: "filled" as const } : row
           );
           for (const notice of notices) {
-            if (current.some((row) => row.id === notice.id)) continue;
+            if (next.some((row) => row.id === notice.id)) continue;
             next.unshift({
               id: notice.id,
               side: notice.side,
@@ -316,7 +302,9 @@ export function TradeForm({
           }
           return next;
         });
-        for (const notice of notices) toast.success(notice.message);
+        for (const notice of notices) {
+          toast.success(notice.message, { duration: 6000 });
+        }
         routerRef.current.refresh();
       } catch (error) {
         console.error("Limit order tick failed", error);

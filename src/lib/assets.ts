@@ -36,6 +36,8 @@ export function assetSymbol(assetId: AssetId): string {
 
 export type OrderSide = "BUY" | "SELL";
 
+export const PENDING_ORDER_LIMIT = 50;
+
 export type OrderView = {
   id: string;
   side: OrderSide;
@@ -44,6 +46,54 @@ export type OrderView = {
   baseAmount: number;
   quoteReserved: number;
 };
+
+export type SpotBalances = {
+  usdt: number;
+  bitcoin: number;
+  ethereum: number;
+  solana: number;
+};
+
+// Wallet rows store spendable balances. Pending buys lock USDT and pending
+// sells lock the base asset, so equity has to add those reserves back.
+export function balancesIncludingReserves(
+  available: SpotBalances,
+  orders: Pick<OrderView, "side" | "assetId" | "baseAmount" | "quoteReserved">[]
+): SpotBalances {
+  let usdt = available.usdt;
+  let bitcoin = available.bitcoin;
+  let ethereum = available.ethereum;
+  let solana = available.solana;
+  for (const order of orders) {
+    switch (order.side) {
+      case "BUY":
+        usdt += order.quoteReserved;
+        break;
+      case "SELL":
+        switch (order.assetId) {
+          case "bitcoin":
+            bitcoin += order.baseAmount;
+            break;
+          case "ethereum":
+            ethereum += order.baseAmount;
+            break;
+          case "solana":
+            solana += order.baseAmount;
+            break;
+          default: {
+            const exhaustive: never = order.assetId;
+            return exhaustive;
+          }
+        }
+        break;
+      default: {
+        const exhaustive: never = order.side;
+        return exhaustive;
+      }
+    }
+  }
+  return { usdt, bitcoin, ethereum, solana };
+}
 
 export function toOrderView(input: {
   id: string;

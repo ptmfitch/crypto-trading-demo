@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import {
   formatFillToast,
   isAssetId,
+  PENDING_ORDER_LIMIT,
   toOrderView,
   type AssetId,
   type OrderSide,
@@ -246,6 +247,7 @@ export async function tickLimitOrders(): Promise<
   const pendingRows = await prisma.order.findMany({
     where: { userId, status: "PENDING" },
     orderBy: { createdAt: "asc" },
+    take: PENDING_ORDER_LIMIT,
   });
   const assetIds = pendingRows.flatMap((order) =>
     isAssetId(order.assetId) ? [order.assetId] : []
@@ -314,6 +316,7 @@ export async function tickLimitOrders(): Promise<
   const still = await prisma.order.findMany({
     where: { userId, status: "PENDING" },
     orderBy: { createdAt: "desc" },
+    take: PENDING_ORDER_LIMIT,
   });
   return {
     ok: true,

@@ -3,7 +3,12 @@ import { describe, it } from "node:test";
 
 import { Prisma } from "@prisma/client";
 
-import { ASSET_IDS, ASSET_SYMBOL, formatFillToast } from "./assets.ts";
+import {
+  ASSET_IDS,
+  ASSET_SYMBOL,
+  balancesIncludingReserves,
+  formatFillToast,
+} from "./assets.ts";
 import {
   LEDGER_ASSETS,
   LEDGER_SYMBOL,
@@ -33,6 +38,32 @@ describe("limit order allowlist", () => {
   it("keeps the client asset list aligned with the ledger", () => {
     assert.deepEqual(ASSET_IDS, LEDGER_ASSETS);
     assert.deepEqual(ASSET_SYMBOL, LEDGER_SYMBOL);
+  });
+});
+
+describe("equity includes reserved order funds", () => {
+  it("adds locked USDT for a resting buy and locked base for a resting sell", () => {
+    const equity = balancesIncludingReserves(
+      { usdt: 6000, bitcoin: 0, ethereum: 0, solana: 0 },
+      [
+        {
+          side: "BUY",
+          assetId: "ethereum",
+          baseAmount: 1.25,
+          quoteReserved: 4000,
+        },
+        {
+          side: "SELL",
+          assetId: "solana",
+          baseAmount: 2,
+          quoteReserved: 300,
+        },
+      ]
+    );
+    assert.equal(equity.usdt, 10000);
+    assert.equal(equity.ethereum, 0);
+    assert.equal(equity.solana, 2);
+    assert.equal(equity.bitcoin, 0);
   });
 });
 

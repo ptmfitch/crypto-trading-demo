@@ -4,7 +4,12 @@ import { DollarSign, ListChecks, TrendingUp, Wallet } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { StatCard } from "@/components/StatCard";
-import { toOrderView, type AssetId } from "@/lib/assets";
+import {
+  balancesIncludingReserves,
+  PENDING_ORDER_LIMIT,
+  toOrderView,
+  type AssetId,
+} from "@/lib/assets";
 import { getAssetPrices, getBtcQuote } from "@/lib/btc-market";
 import { quoteDelayLabel, type BtcQuoteStatus } from "@/lib/btc-quote";
 import { BtcPriceChart } from "./_components/BtcPriceChart";
@@ -34,26 +39,16 @@ async function getDashboardData(userId: string) {
   const btc = Number(wallet.btcBalance);
   const eth = Number(wallet.ethBalance);
   const sol = Number(wallet.solBalance);
-  const [tradeCount, quote, pendingRows, altPrices] = await Promise.all([
+  const [tradeCount, quote, pendingRows] = await Promise.all([
     prisma.trade.count({ where: { userId } }),
     getBtcQuote(),
     prisma.order.findMany({
       where: { userId, status: "PENDING" },
       orderBy: { createdAt: "desc" },
+      take: PENDING_ORDER_LIMIT,
     }),
-    eth > 0 || sol > 0
-      ? getAssetPrices(["ethereum", "solana"])
-      : Promise.resolve({} as Partial<Record<AssetId, number>>),
   ]);
 
-  const btcValue = markedValue(btc, quote.usd);
-  const ethValue = markedValue(eth, altPrices.ethereum);
-  const solValue = markedValue(sol, altPrices.solana);
-  const totalValue =
-    btcValue == null || ethValue == null || solValue == null
-      ? null
-      : usdt + btcValue + ethValue + solValue;
-  const pnl = totalValue == null ? null : totalValue - 10000;
   const pendingOrders = pendingRows.flatMap((order) => {
     const view = toOrderView({
       id: order.id,
@@ -65,6 +60,23 @@ async function getDashboardData(userId: string) {
     });
     return view ? [view] : [];
   });
+  const equity = balancesIncludingReserves(
+    { usdt, bitcoin: btc, ethereum: eth, solana: sol },
+    pendingOrders
+  );
+  const altPrices =
+    equity.ethereum > 0 || equity.solana > 0
+      ? await getAssetPrices(["ethereum", "solana"])
+      : ({} as Partial<Record<AssetId, number>>);
+
+  const btcValue = markedValue(equity.bitcoin, quote.usd);
+  const ethValue = markedValue(equity.ethereum, altPrices.ethereum);
+  const solValue = markedValue(equity.solana, altPrices.solana);
+  const totalValue =
+    btcValue == null || ethValue == null || solValue == null
+      ? null
+      : equity.usdt + btcValue + ethValue + solValue;
+  const pnl = totalValue == null ? null : totalValue - 10000;
 
   return { wallet, tradeCount, quote, totalValue, pnl, eth, sol, pendingOrders };
 }

@@ -4,7 +4,8 @@ import { DollarSign, ListChecks, TrendingUp, Wallet } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { StatCard } from "@/components/StatCard";
-import { getBtcQuote } from "@/lib/btc-market";
+import { toOrderView, type AssetId } from "@/lib/assets";
+import { getAssetPrices, getBtcQuote } from "@/lib/btc-market";
 import { quoteDelayLabel, type BtcQuoteStatus } from "@/lib/btc-quote";
 import { BtcPriceChart } from "./_components/BtcPriceChart";
 import { TradeForm } from "./_components/TradeForm";
@@ -16,10 +17,10 @@ function formatUsd(value: number) {
   })}`;
 }
 
-function portfolioValue(usdt: number, btc: number, usd: number | null) {
-  if (usd != null) return usdt + btc * usd;
-  if (btc === 0) return usdt;
-  return null;
+function markedValue(qty: number, price: number | null | undefined) {
+  if (qty === 0) return 0;
+  if (price == null) return null;
+  return qty * price;
 }
 
 async function getDashboardData(userId: string) {
@@ -29,17 +30,43 @@ async function getDashboardData(userId: string) {
     return null;
   }
 
-  const [tradeCount, quote] = await Promise.all([
-    prisma.trade.count({ where: { userId } }),
-    getBtcQuote(),
-  ]);
-
   const usdt = Number(wallet.usdtBalance);
   const btc = Number(wallet.btcBalance);
-  const totalValue = portfolioValue(usdt, btc, quote.usd);
-  const pnl = totalValue == null ? null : totalValue - 10000;
+  const eth = Number(wallet.ethBalance);
+  const sol = Number(wallet.solBalance);
+  const [tradeCount, quote, pendingRows, altPrices] = await Promise.all([
+    prisma.trade.count({ where: { userId } }),
+    getBtcQuote(),
+    prisma.order.findMany({
+      where: { userId, status: "PENDING" },
+      orderBy: { createdAt: "desc" },
+    }),
+    eth > 0 || sol > 0
+      ? getAssetPrices(["ethereum", "solana"])
+      : Promise.resolve({} as Partial<Record<AssetId, number>>),
+  ]);
 
-  return { wallet, tradeCount, quote, totalValue, pnl };
+  const btcValue = markedValue(btc, quote.usd);
+  const ethValue = markedValue(eth, altPrices.ethereum);
+  const solValue = markedValue(sol, altPrices.solana);
+  const totalValue =
+    btcValue == null || ethValue == null || solValue == null
+      ? null
+      : usdt + btcValue + ethValue + solValue;
+  const pnl = totalValue == null ? null : totalValue - 10000;
+  const pendingOrders = pendingRows.flatMap((order) => {
+    const view = toOrderView({
+      id: order.id,
+      side: order.side,
+      assetId: order.assetId,
+      limitPrice: Number(order.limitPrice),
+      baseAmount: Number(order.baseAmount),
+      quoteReserved: Number(order.quoteReserved),
+    });
+    return view ? [view] : [];
+  });
+
+  return { wallet, tradeCount, quote, totalValue, pnl, eth, sol, pendingOrders };
 }
 
 function priceStat(status: BtcQuoteStatus, usd: number | null) {
@@ -90,16 +117,18 @@ export default async function DashboardPage() {
     );
   }
 
-  const { wallet, quote, totalValue, pnl, tradeCount } = data;
+  const { wallet, quote, totalValue, pnl, tradeCount, eth, sol, pendingOrders } = data;
   const pnlColor =
     pnl == null ? "text-muted-foreground" : pnl >= 0 ? "text-green-500" : "text-red-500";
   const price = priceStat(quote.status, quote.usd);
   const portfolioDescription =
     quote.status === "stale"
       ? "Includes a delayed BTC quote"
-      : quote.status === "unavailable" && totalValue == null
+      : totalValue == null && quote.status === "unavailable" && eth === 0 && sol === 0
         ? "BTC value unavailable"
-        : undefined;
+        : totalValue == null
+          ? "Asset value unavailable"
+          : undefined;
 
   return (
     <main className="flex-1 bg-muted/40">
@@ -160,6 +189,9 @@ export default async function DashboardPage() {
               quoteStatus={quote.status}
               usdtBalance={Number(wallet.usdtBalance)}
               btcBalance={Number(wallet.btcBalance)}
+              ethBalance={eth}
+              solBalance={sol}
+              initialOrders={pendingOrders}
             />
           </div>
         </div>

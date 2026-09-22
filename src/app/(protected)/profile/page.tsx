@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { assetSymbol, isAssetId } from "@/lib/assets";
 import prisma from "@/lib/prisma";
 import {
   formatTradeHistoryBtc,
@@ -31,19 +32,25 @@ function calculatePnlHistory(trades: Trade[]): PnlDataPoint[] {
     return [];
   }
   let currentUsdt = INITIAL_CAPITAL;
-  let currentBtc = 0;
+  const base = { bitcoin: 0, ethereum: 0, solana: 0 };
+  const marks = { bitcoin: 0, ethereum: 0, solana: 0 };
   const pnlHistory: PnlDataPoint[] = trades.map((trade) => {
     const usdtAmount = Number(trade.usdtAmount);
-    const btcAmount = Number(trade.btcAmount);
+    const baseAmount = Number(trade.btcAmount);
+    const asset = isAssetId(trade.assetId) ? trade.assetId : "bitcoin";
     if (trade.type === "BUY") {
       currentUsdt -= usdtAmount;
-      currentBtc += btcAmount;
+      base[asset] += baseAmount;
     } else {
       currentUsdt += usdtAmount;
-      currentBtc -= btcAmount;
+      base[asset] -= baseAmount;
     }
+    marks[asset] = Number(trade.priceAtTrade);
     const portfolioValue =
-      currentUsdt + currentBtc * Number(trade.priceAtTrade);
+      currentUsdt +
+      base.bitcoin * marks.bitcoin +
+      base.ethereum * marks.ethereum +
+      base.solana * marks.solana;
     const pnl = portfolioValue - INITIAL_CAPITAL;
     return {
       date: trade.timestamp.toISOString(),
@@ -165,7 +172,7 @@ export default async function ProfilePage() {
                   <TableHead>Date</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Price (USD)</TableHead>
-                  <TableHead>Amount (BTC)</TableHead>
+                  <TableHead>Amount</TableHead>
                   <TableHead className="text-right">Total (USD)</TableHead>
                 </TableRow>
               </TableHeader>
@@ -205,7 +212,10 @@ export default async function ProfilePage() {
                         ${Number(trade.priceAtTrade).toLocaleString()}
                       </TableCell>
                       <TableCell>
-                        {formatTradeHistoryBtc(trade.btcAmount)}
+                        {formatTradeHistoryBtc(trade.btcAmount)}{" "}
+                        {assetSymbol(
+                          isAssetId(trade.assetId) ? trade.assetId : "bitcoin"
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         {formatTradeHistoryTotal(trade.usdtAmount)}

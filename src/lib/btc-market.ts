@@ -2,15 +2,16 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { type AssetId } from "@/lib/assets";
 import {
+  FRESH_TTL_MS,
   type CachedQuote,
   type ResolvedQuote,
   resolveBtcQuote,
   type UpstreamQuote,
 } from "@/lib/btc-quote";
 
-const PRICE_URL =
-  "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true";
+const SIMPLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price";
 const CHART_URL =
   "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=";
 const CHART_FRESH_TTL_MS = 900_000;
@@ -31,6 +32,15 @@ export type BtcChart = {
   status: BtcQuote["status"];
   points: ChartPoint[];
 };
+
+type AssetPriceCache = Record<string, { usd: number; fetchedAt: number }>;
+
+function assetCachePath() {
+  return (
+    process.env.ASSET_PRICE_CACHE_FILE ||
+    path.join(os.tmpdir(), "tradesim-asset-price-cache.json")
+  );
+}
 
 function priceCachePath() {
   return (
@@ -99,28 +109,104 @@ function strip(quote: ResolvedQuote): BtcQuote {
   };
 }
 
-async function fetchCoinGeckoPrice(): Promise<UpstreamQuote> {
+type SimpleRow = { usd: number; usd24hChange: number | null };
+
+async function fetchCoinGeckoSimple(
+  ids: readonly string[],
+  include24h: boolean
+): Promise<Record<string, SimpleRow>> {
+  if (ids.length === 0 || upstreamBlocked()) return {};
   try {
-    const response = await fetch(PRICE_URL, {
+    const params = new URLSearchParams({
+      ids: ids.join(","),
+      vs_currencies: "usd",
+    });
+    if (include24h) params.set("include_24hr_change", "true");
+    const response = await fetch(`${SIMPLE_PRICE_URL}?${params}`, {
       cache: "no-store",
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     });
-    if (!response.ok) return { ok: false };
-    const data = (await response.json()) as {
-      bitcoin?: { usd?: unknown; usd_24h_change?: unknown };
-    };
-    const usd = data.bitcoin?.usd;
-    const change = data.bitcoin?.usd_24h_change;
-    if (typeof usd !== "number") return { ok: false };
-    return {
-      ok: true,
-      usd,
-      usd24hChange: typeof change === "number" ? change : null,
-    };
+    if (!response.ok) return {};
+    const data = (await response.json()) as Record<
+      string,
+      { usd?: unknown; usd_24h_change?: unknown }
+    >;
+    const out: Record<string, SimpleRow> = {};
+    for (const id of ids) {
+      const row = data[id];
+      const usd = row?.usd;
+      if (typeof usd !== "number" || !(usd > 0)) continue;
+      const change = row?.usd_24h_change;
+      out[id] = {
+        usd,
+        usd24hChange: typeof change === "number" ? change : null,
+      };
+    }
+    return out;
   } catch (error) {
-    console.error("[BTC Price] upstream failed", error);
-    return { ok: false };
+    console.error("[CoinGecko] upstream failed", error);
+    return {};
   }
+}
+
+async function fetchCoinGeckoPrice(): Promise<UpstreamQuote> {
+  const rows = await fetchCoinGeckoSimple(["bitcoin"], true);
+  const row = rows.bitcoin;
+  if (!row) return { ok: false };
+  return { ok: true, usd: row.usd, usd24hChange: row.usd24hChange };
+}
+
+function readAssetCache(): AssetPriceCache {
+  const parsed = readJson(assetCachePath());
+  if (!parsed || typeof parsed !== "object") return {};
+  const cache: AssetPriceCache = {};
+  for (const [key, value] of Object.entries(parsed)) {
+    if (!value || typeof value !== "object") continue;
+    const row = value as { usd?: unknown; fetchedAt?: unknown };
+    if (typeof row.usd !== "number" || typeof row.fetchedAt !== "number") {
+      continue;
+    }
+    cache[key] = { usd: row.usd, fetchedAt: row.fetchedAt };
+  }
+  return cache;
+}
+
+export async function getAssetPrices(
+  ids: readonly AssetId[]
+): Promise<Partial<Record<AssetId, number>>> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0 || upstreamBlocked()) return {};
+
+  const now = Date.now();
+  const cached = readAssetCache();
+  const result: Partial<Record<AssetId, number>> = {};
+  const missing: AssetId[] = [];
+  for (const id of unique) {
+    const row = cached[id];
+    if (
+      row &&
+      row.usd > 0 &&
+      row.fetchedAt <= now + 5_000 &&
+      now - row.fetchedAt < FRESH_TTL_MS
+    ) {
+      result[id] = row.usd;
+    } else {
+      missing.push(id);
+    }
+  }
+  if (missing.length === 0) return result;
+
+  const fetched = await fetchCoinGeckoSimple(missing, false);
+  let wrote = false;
+  for (const id of missing) {
+    const row = fetched[id];
+    if (!row) continue;
+    cached[id] = { usd: row.usd, fetchedAt: now };
+    result[id] = row.usd;
+    wrote = true;
+  }
+  if (wrote) writeJson(assetCachePath(), cached);
+  return result;
 }
 
 export async function getBtcQuote(): Promise<BtcQuote> {

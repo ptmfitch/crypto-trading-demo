@@ -17,6 +17,7 @@ import {
   creditFill,
   emptyPosition,
   fillTrade,
+  limitOrderRested,
   reserveOnPlace,
   type Position,
 } from "./limit-order.ts";
@@ -33,6 +34,13 @@ function cash(usdt: string, extras?: Partial<Record<"bitcoin" | "ethereum" | "so
     solana: d(extras?.solana ?? 0),
   };
 }
+
+describe("limit rest", () => {
+  it("keeps a new order pending until it has been on screen", () => {
+    assert.equal(limitOrderRested(1_000, 3_499), false);
+    assert.equal(limitOrderRested(1_000, 3_500), true);
+  });
+});
 
 describe("limit order allowlist", () => {
   it("keeps the client asset list aligned with the ledger", () => {

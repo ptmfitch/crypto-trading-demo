@@ -335,7 +335,7 @@ export function TradeForm({
           return next;
         });
         for (const notice of notices) {
-          toast.success(notice.message, { duration: 6000 });
+          toast.success(notice.message, { duration: 8000 });
         }
         routerRef.current.refresh();
       } catch (error) {

@@ -40,6 +40,8 @@ export type FillLeg = {
   priceAtTrade: Prisma.Decimal;
 };
 
+export const LIMIT_REST_MS = 2_500;
+
 const ZERO = new Prisma.Decimal(0);
 const QUOTE_DP = 2;
 const BASE_DP = 8;
@@ -256,6 +258,10 @@ export function cancelPending(
     position: credit(position, reserved.bucket, reserved.amount),
     order: { ...order, status: "CANCELED" },
   };
+}
+
+export function limitOrderRested(createdAtMs: number, now: number): boolean {
+  return now - createdAtMs >= LIMIT_REST_MS;
 }
 
 export function crossesLimit(

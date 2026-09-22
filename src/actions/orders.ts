@@ -16,6 +16,7 @@ import {
   fillCredit,
   fillTrade,
   insufficientBalanceMessage,
+  limitOrderRested,
   reservedAmount,
   type BalanceBucket,
   type WorkingOrder,
@@ -260,6 +261,8 @@ export async function tickLimitOrders(): Promise<
     if (row.side !== "BUY" && row.side !== "SELL") continue;
     const live = prices[row.assetId];
     if (live == null) continue;
+    // Leave a new order on screen before a crossed limit can fill it.
+    if (!limitOrderRested(row.createdAt.getTime(), Date.now())) continue;
     const working: WorkingOrder = {
       side: row.side,
       assetId: row.assetId,

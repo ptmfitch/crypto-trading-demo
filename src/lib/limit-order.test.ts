@@ -8,6 +8,9 @@ import {
   ASSET_SYMBOL,
   balancesIncludingReserves,
   formatFillToast,
+  mergePendingRows,
+  type OrderRow,
+  type OrderView,
 } from "./assets.ts";
 import {
   LEDGER_ASSETS,
@@ -34,6 +37,52 @@ function cash(usdt: string, extras?: Partial<Record<"bitcoin" | "ethereum" | "so
     solana: d(extras?.solana ?? 0),
   };
 }
+
+function view(id: string, quote = 20): OrderView {
+  return {
+    id,
+    side: "BUY",
+    assetId: "ethereum",
+    limitPrice: 9000,
+    baseAmount: quote / 9000,
+    quoteReserved: quote,
+  };
+}
+
+function pending(id: string): OrderRow {
+  return { ...view(id), phase: "pending" };
+}
+
+describe("pending row merge", () => {
+  it("keeps an optimistic row until the server lists it", () => {
+    const merged = mergePendingRows([pending("a")], [], new Set(), new Set());
+    assert.deepEqual(merged.justFilled, []);
+    assert.equal(merged.rows[0]?.phase, "pending");
+    assert.equal(merged.rows[0]?.id, "a");
+  });
+
+  it("flashes a listed row that the server dropped", () => {
+    const merged = mergePendingRows(
+      [pending("a")],
+      [],
+      new Set(["a"]),
+      new Set()
+    );
+    assert.equal(merged.justFilled[0]?.id, "a");
+    assert.equal(merged.rows[0]?.phase, "filled");
+  });
+
+  it("drops a canceled row without calling it filled", () => {
+    const merged = mergePendingRows(
+      [pending("a")],
+      [],
+      new Set(["a"]),
+      new Set(["a"])
+    );
+    assert.deepEqual(merged.justFilled, []);
+    assert.deepEqual(merged.rows, []);
+  });
+});
 
 describe("limit rest", () => {
   it("keeps a new order pending until it has been on screen", () => {

@@ -47,6 +47,50 @@ export type OrderView = {
   quoteReserved: number;
 };
 
+export type OrderRow = OrderView & { phase: "pending" | "filled" };
+
+// A refresh can arrive before the tick response. Keep an optimistic row until
+// the server has listed it, and treat a listed row that then vanishes as a fill
+// so the card can flash instead of disappearing.
+export function mergePendingRows(
+  current: OrderRow[],
+  serverPending: OrderView[],
+  seenOnServer: ReadonlySet<string>,
+  canceledIds: ReadonlySet<string>
+): { rows: OrderRow[]; justFilled: OrderView[] } {
+  const serverIds = new Set(serverPending.map((order) => order.id));
+  const justFilled = current.filter(
+    (row) =>
+      row.phase === "pending" &&
+      seenOnServer.has(row.id) &&
+      !serverIds.has(row.id) &&
+      !canceledIds.has(row.id)
+  );
+  const filled = new Map<string, OrderRow>();
+  for (const row of current) {
+    if (canceledIds.has(row.id) || row.phase !== "filled") continue;
+    filled.set(row.id, row);
+  }
+  for (const row of justFilled) {
+    filled.set(row.id, { ...row, phase: "filled" });
+  }
+  const rows: OrderRow[] = [];
+  const seen = new Set<string>();
+  for (const order of serverPending) {
+    if (filled.has(order.id) || canceledIds.has(order.id)) continue;
+    rows.push({ ...order, phase: "pending" });
+    seen.add(order.id);
+  }
+  for (const row of current) {
+    if (row.phase !== "pending" || seen.has(row.id) || filled.has(row.id)) continue;
+    if (canceledIds.has(row.id) || seenOnServer.has(row.id)) continue;
+    rows.push(row);
+    seen.add(row.id);
+  }
+  rows.push(...filled.values());
+  return { rows, justFilled };
+}
+
 export type SpotBalances = {
   usdt: number;
   bitcoin: number;

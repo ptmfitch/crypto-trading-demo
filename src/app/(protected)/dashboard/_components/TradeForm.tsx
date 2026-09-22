@@ -12,9 +12,12 @@ import {
   ASSET_IDS,
   assetSymbol,
   formatBaseQty,
+  formatFillToast,
   formatQuoteUsd,
   isAssetId,
+  mergePendingRows,
   type AssetId,
+  type OrderRow,
   type OrderSide,
   type OrderView,
 } from "@/lib/assets";
@@ -52,7 +55,7 @@ interface TradeFormProps {
 }
 
 type OrderMode = "market" | "limit";
-type Row = OrderView & { phase: "pending" | "filled" };
+type Row = OrderRow;
 
 function isQuoteStatus(value: unknown): value is BtcQuoteStatus {
   return value === "fresh" || value === "stale" || value === "unavailable";
@@ -168,6 +171,9 @@ export function TradeForm({
   rowsRef.current = rows;
   const initialOrdersRef = useRef(initialOrders);
   initialOrdersRef.current = initialOrders;
+  const seenOnServer = useRef(new Set<string>());
+  const canceledIds = useRef(new Set<string>());
+  const toastedIds = useRef(new Set<string>());
   const ordersSignature = initialOrders.map((order) => order.id).join(",");
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -241,17 +247,26 @@ export function TradeForm({
     return () => clearInterval(interval);
   }, []);
 
-  // router.refresh() updates initialOrders, but rows is local state. Rebuild
-  // pending rows from the server list and keep fill flashes on screen.
+  // router.refresh() updates initialOrders, but rows is local state. A refresh
+  // that lands before the tick response must not delete the card.
   useEffect(() => {
-    setRows((current) => {
-      const flashes = current.filter((row) => row.phase === "filled");
-      const flashIds = new Set(flashes.map((row) => row.id));
-      const pending = initialOrdersRef.current
-        .filter((order) => !flashIds.has(order.id))
-        .map((order) => ({ ...order, phase: "pending" as const }));
-      return [...pending, ...flashes];
-    });
+    const server = initialOrdersRef.current;
+    const merged = mergePendingRows(
+      rowsRef.current,
+      server,
+      seenOnServer.current,
+      canceledIds.current
+    );
+    for (const order of server) seenOnServer.current.add(order.id);
+    setRows(merged.rows);
+    for (const row of merged.justFilled) {
+      if (toastedIds.current.has(row.id)) continue;
+      toastedIds.current.add(row.id);
+      toast.success(
+        formatFillToast(row.side, row.assetId, row.baseAmount, row.limitPrice),
+        { duration: 8000 }
+      );
+    }
   }, [ordersSignature]);
 
   useEffect(() => {
@@ -335,6 +350,8 @@ export function TradeForm({
           return next;
         });
         for (const notice of notices) {
+          if (toastedIds.current.has(notice.id)) continue;
+          toastedIds.current.add(notice.id);
           toast.success(notice.message, { duration: 8000 });
         }
         routerRef.current.refresh();
@@ -426,6 +443,7 @@ export function TradeForm({
         router.refresh();
         return;
       }
+      canceledIds.current.add(orderId);
       setRows((current) => current.filter((row) => row.id !== orderId));
       toast("Order canceled");
       router.refresh();

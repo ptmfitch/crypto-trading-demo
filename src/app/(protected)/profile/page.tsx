@@ -10,6 +10,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  calculateAdvancedStats,
+  formatWinRate,
+} from "@/lib/key-metrics";
 import prisma from "@/lib/prisma";
 import {
   formatTradeHistoryBtc,
@@ -53,23 +57,6 @@ function calculatePnlHistory(trades: Trade[]): PnlDataPoint[] {
   return pnlHistory;
 }
 
-function calculateAdvancedStats(trades: Trade[], pnlData: PnlDataPoint[]) {
-  if (trades.length < 2)
-    return { winRate: 0, bestTradePnl: 0, worstTradePnl: 0 };
-  let wins = 0;
-  let bestTradePnl = 0;
-  let worstTradePnl = 0;
-  for (let i = 0; i < pnlData.length; i++) {
-    const pnlChange =
-      i === 0 ? pnlData[i].pnl : pnlData[i].pnl - pnlData[i - 1].pnl;
-    if (pnlChange > 0) wins++;
-    if (pnlChange > bestTradePnl) bestTradePnl = pnlChange;
-    if (pnlChange < worstTradePnl) worstTradePnl = pnlChange;
-  }
-  const winRate = (wins / trades.length) * 10;
-  return { winRate, bestTradePnl, worstTradePnl };
-}
-
 export default async function ProfilePage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
@@ -84,7 +71,7 @@ export default async function ProfilePage() {
   const pnlColor = finalPnl >= 0 ? "text-green-500" : "text-red-500";
   const hasSufficientDataForChart = pnlData && pnlData.length > 1;
   const { winRate, bestTradePnl, worstTradePnl } = calculateAdvancedStats(
-    trades,
+    trades.length,
     pnlData
   );
 
@@ -129,7 +116,7 @@ export default async function ProfilePage() {
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Win Rate</span>{" "}
-                  <span className="font-semibold">{winRate.toFixed(1)}%</span>
+                  <span className="font-semibold">{formatWinRate(winRate)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Total Trades</span>{" "}

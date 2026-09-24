@@ -4,6 +4,7 @@ import { getBtcQuote } from "@/lib/btc-market";
 import prisma from "@/lib/prisma";
 import {
   fillMessage,
+  MAX_RECURRING_PLANS,
   nextFutureRun,
   periodOutcome,
   type RecurringAssetId,
@@ -100,6 +101,7 @@ export async function runDueRecurringPlans(
   const due = await prisma.recurringPlan.findMany({
     where: { userId, status: "ACTIVE", nextRunAt: { lte: now } },
     orderBy: { nextRunAt: "asc" },
+    take: MAX_RECURRING_PLANS,
   });
   if (due.length === 0) return { fills: [], changed: false };
 

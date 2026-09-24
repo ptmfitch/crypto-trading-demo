@@ -6,6 +6,7 @@ import { runDueRecurringPlans } from "@/lib/recurring-run";
 import {
   advanceNextRun,
   planActiveMessage,
+  MAX_RECURRING_PLANS,
   RECURRING_ASSETS,
   RECURRING_CADENCES,
   type RecurringAssetId,
@@ -44,6 +45,13 @@ export async function createRecurringPlan(input: {
     quoteAmount: Math.round(input.quoteAmount * 100) / 100,
   });
   if (!parsed.success) return { ok: false as const, error: "Invalid plan" };
+
+  const existing = await prisma.recurringPlan.count({
+    where: { userId: id, status: { in: ["ACTIVE", "PAUSED"] } },
+  });
+  if (existing >= MAX_RECURRING_PLANS) {
+    return { ok: false as const, error: "Plan limit reached" };
+  }
 
   const now = new Date();
   await prisma.recurringPlan.create({

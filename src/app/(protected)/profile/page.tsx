@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { StatCard } from "@/components/StatCard";
 import { runDueRecurringPlans } from "@/lib/recurring-run";
-import type { RecurringPlanView } from "@/lib/recurring";
+import { MAX_RECURRING_PLANS, type RecurringPlanView } from "@/lib/recurring";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -89,6 +89,7 @@ export default async function ProfilePage() {
         status: { in: ["ACTIVE", "PAUSED"] },
       },
       orderBy: { createdAt: "desc" },
+      take: MAX_RECURRING_PLANS,
     }),
   ]);
   const planViews: RecurringPlanView[] = plans.flatMap((plan) =>

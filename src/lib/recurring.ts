@@ -1,3 +1,5 @@
+export const MAX_RECURRING_PLANS = 50;
+
 export const RECURRING_ASSETS = ["bitcoin", "ethereum", "solana"] as const;
 export type RecurringAssetId = (typeof RECURRING_ASSETS)[number];
 

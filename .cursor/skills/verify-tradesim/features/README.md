@@ -45,3 +45,4 @@ Each feature file starts with an H1 title and one paragraph describing the user-
 - [Buy BTC](./buy-btc.md) covers a cash purchase from the dashboard and the updated balances.
 - [Price delayed](./price-delayed.md) covers a CoinGecko miss that keeps the dashboard and pauses trading.
 - [Profile](./profile.md) covers the performance report and trade history.
+- [Recurring buy](./recurring-buy.md) covers the DCA plan sheet, the profile list, and the on-load fill.

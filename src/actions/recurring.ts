@@ -5,11 +5,10 @@ import prisma from "@/lib/prisma";
 import { runDueRecurringPlans } from "@/lib/recurring-run";
 import {
   advanceNextRun,
-  planActiveMessage,
+  isCreatableAsset,
   MAX_RECURRING_PLANS,
-  RECURRING_ASSETS,
+  planActiveMessage,
   RECURRING_CADENCES,
-  type RecurringAssetId,
   type RecurringCadence,
 } from "@/lib/recurring";
 import { Prisma } from "@prisma/client";
@@ -17,7 +16,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 const CreateSchema = z.object({
-  assetId: z.enum(RECURRING_ASSETS),
+  assetId: z.literal("bitcoin"),
   quoteAmount: z.number().positive().max(1_000_000),
   cadence: z.enum(RECURRING_CADENCES),
 });
@@ -33,12 +32,15 @@ async function userId() {
 }
 
 export async function createRecurringPlan(input: {
-  assetId: RecurringAssetId;
+  assetId: string;
   quoteAmount: number;
   cadence: RecurringCadence;
 }) {
   const id = await userId();
   if (!id) return { ok: false as const, error: "Not authenticated" };
+  if (!isCreatableAsset(input.assetId)) {
+    return { ok: false as const, error: "Only Bitcoin plans can be created" };
+  }
 
   const parsed = CreateSchema.safeParse({
     ...input,

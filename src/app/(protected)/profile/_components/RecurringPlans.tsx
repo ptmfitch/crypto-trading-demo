@@ -8,14 +8,10 @@ import {
   tickRecurringPlans,
 } from "@/actions/recurring";
 import {
-  ASSET_NAME,
-  ASSET_SYMBOL,
   cadenceLabel,
   formatNextRunLabel,
   pausedDetail,
   planTitle,
-  RECURRING_ASSETS,
-  type RecurringAssetId,
   type RecurringCadence,
   type RecurringPlanView,
 } from "@/lib/recurring";
@@ -32,11 +28,6 @@ import { toast } from "sonner";
 
 const CHIPS = [50, 100, 250] as const;
 const POLL_MS = 15_000;
-const DOT: Record<RecurringAssetId, string> = {
-  bitcoin: "#f7931a",
-  ethereum: "#627eea",
-  solana: "#14f195",
-};
 
 const seenToasts = new Set<string>();
 
@@ -85,7 +76,6 @@ export function RecurringPlans({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [assetId, setAssetId] = useState<RecurringAssetId>("bitcoin");
   const [amount, setAmount] = useState("50.00");
   const [cadence, setCadence] = useState<RecurringCadence>("WEEKLY");
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -117,7 +107,6 @@ export function RecurringPlans({
   }, [open]);
 
   function openSheet() {
-    setAssetId("bitcoin");
     setAmount("50.00");
     setCadence("WEEKLY");
     setOpen(true);
@@ -128,7 +117,7 @@ export function RecurringPlans({
     if (parsed == null) return;
     startTransition(async () => {
       const result = await createRecurringPlan({
-        assetId,
+        assetId: "bitcoin",
         quoteAmount: parsed,
         cadence,
       });
@@ -291,29 +280,15 @@ export function RecurringPlans({
               </button>
             </div>
 
-            <label className="text-xs font-medium text-[#b5b5b5]" htmlFor="recurring-asset">
-              Asset
-            </label>
+            <p className="text-xs font-medium text-[#b5b5b5]">Asset</p>
             <div className="flex items-center gap-2 rounded-[8px] bg-[#454545] px-3 py-2.5">
               <span
                 aria-hidden
-                className="size-5 shrink-0 rounded-full"
-                style={{ backgroundColor: DOT[assetId] }}
+                className="size-5 shrink-0 rounded-full bg-[#f7931a]"
               />
-              <select
-                id="recurring-asset"
-                value={assetId}
-                onChange={(event) =>
-                  setAssetId(event.target.value as RecurringAssetId)
-                }
-                className="w-full bg-transparent text-[13px] font-semibold text-[#fbfbfb] outline-none"
-              >
-                {RECURRING_ASSETS.map((asset) => (
-                  <option key={asset} value={asset}>
-                    {ASSET_SYMBOL[asset]} · {ASSET_NAME[asset]}
-                  </option>
-                ))}
-              </select>
+              <p className="text-[13px] font-semibold text-[#fbfbfb]">
+                BTC · Bitcoin (v1 locked)
+              </p>
             </div>
 
             <label

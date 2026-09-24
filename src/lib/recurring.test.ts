@@ -7,6 +7,7 @@ import {
   formatNextRunLabel,
   nextFutureRun,
   pausedDetail,
+  isCreatableAsset,
   periodOutcome,
   planActiveMessage,
   planTitle,
@@ -58,6 +59,13 @@ describe("recurring plans", () => {
       "Paused · last fill 2d ago",
     );
     assert.equal(pausedDetail(now, now), "Paused · last fill today");
+  });
+
+  it("accepts only bitcoin when creating a plan", () => {
+    assert.equal(isCreatableAsset("bitcoin"), true);
+    assert.equal(isCreatableAsset("ethereum"), false);
+    assert.equal(isCreatableAsset("solana"), false);
+    assert.equal(isCreatableAsset(""), false);
   });
 
   it("fills BTC when the quote and balance allow it, and skips otherwise", () => {

@@ -6,6 +6,8 @@ import { redirect } from "next/navigation";
 import { StatCard } from "@/components/StatCard";
 import { getBtcQuote } from "@/lib/btc-market";
 import { quoteDelayLabel, type BtcQuoteStatus } from "@/lib/btc-quote";
+import { runDueRecurringPlans } from "@/lib/recurring-run";
+import { RecurringFillToast } from "../profile/_components/RecurringPlans";
 import { BtcPriceChart } from "./_components/BtcPriceChart";
 import { TradeForm } from "./_components/TradeForm";
 
@@ -73,6 +75,7 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
+  const tick = await runDueRecurringPlans(session.user.id);
   const data = await getDashboardData(session.user.id);
   if (!data) {
     return (
@@ -103,6 +106,10 @@ export default async function DashboardPage() {
 
   return (
     <main className="flex-1 bg-muted/40">
+      <RecurringFillToast
+        toastId={tick.fills.length > 0 ? crypto.randomUUID() : null}
+        messages={tick.fills}
+      />
       <div className="container mx-auto py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold">

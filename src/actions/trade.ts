@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { assertTradableQuote } from "@/lib/btc-quote";
 import { getBtcQuote } from "@/lib/btc-market";
+import { settleUsdtBuy } from "@/lib/market-buy";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -36,6 +37,25 @@ export async function executeTrade(values: z.infer<typeof TradeSchema>) {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+      if (tradeType === "BUY" && asset === "USDT") {
+        const settled = await settleUsdtBuy(
+          tx,
+          userId,
+          new Prisma.Decimal(amount),
+          liveBtcPrice,
+        );
+        if (!settled.ok) {
+          throw new Error(
+            settled.reason === "insufficient"
+              ? "Insufficient USDT balance."
+              : "Wallet not found.",
+          );
+        }
+        return {
+          message: `Successfully bought ${settled.btcAmount.toDP(6)} BTC for $${new Prisma.Decimal(amount).toDP(2)}`,
+        };
+      }
+
       const wallet = await tx.wallet.findUnique({ where: { userId } });
       if (!wallet) throw new Error("Wallet not found.");
 

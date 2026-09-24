@@ -1,5 +1,7 @@
 import { auth } from "@/auth";
 import { StatCard } from "@/components/StatCard";
+import { runDueRecurringPlans } from "@/lib/recurring-run";
+import { MAX_RECURRING_PLANS, type RecurringPlanView } from "@/lib/recurring";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -23,6 +25,7 @@ import {
   PnlDataPoint,
   PortfolioPnlChart,
 } from "./_components/PortfolioPnlChart";
+import { RecurringPlans } from "./_components/RecurringPlans";
 
 const INITIAL_CAPITAL = 10000;
 
@@ -74,10 +77,36 @@ export default async function ProfilePage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const trades = await prisma.trade.findMany({
-    where: { userId: session.user.id },
-    orderBy: { timestamp: "asc" },
-  });
+  const tick = await runDueRecurringPlans(session.user.id);
+  const [trades, plans] = await Promise.all([
+    prisma.trade.findMany({
+      where: { userId: session.user.id },
+      orderBy: { timestamp: "asc" },
+    }),
+    prisma.recurringPlan.findMany({
+      where: {
+        userId: session.user.id,
+        status: { in: ["ACTIVE", "PAUSED"] },
+      },
+      orderBy: { createdAt: "desc" },
+      take: MAX_RECURRING_PLANS,
+    }),
+  ]);
+  const planViews: RecurringPlanView[] = plans.flatMap((plan) =>
+    plan.status === "CANCELED"
+      ? []
+      : [
+          {
+            id: plan.id,
+            assetId: plan.assetId,
+            quoteAmount: Number(plan.quoteAmount),
+            cadence: plan.cadence,
+            status: plan.status,
+            nextRunAt: plan.nextRunAt.toISOString(),
+            lastRunAt: plan.lastRunAt?.toISOString() ?? null,
+          },
+        ],
+  );
 
   const pnlData = calculatePnlHistory(trades);
   const finalPnl = pnlData.length > 0 ? pnlData[pnlData.length - 1].pnl : 0;
@@ -91,6 +120,12 @@ export default async function ProfilePage() {
   return (
     <main className="flex-1 bg-muted/40">
       <div className="container mx-auto py-8">
+        <RecurringPlans
+          plans={planViews}
+          toastId={tick.fills.length > 0 ? crypto.randomUUID() : null}
+          fills={tick.fills}
+        />
+
         <div className="mb-6">
           <h1 className="text-3xl font-bold">Performance Report</h1>
           <p className="text-muted-foreground">

@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
@@ -39,10 +40,22 @@ export default function RegisterPage() {
     startTransition(async () => {
       const result = await registerUser(values);
       if (result.success) {
-        toast.success("Account Created", {
-          description: "You can now log in with your credentials.",
+        const signInResult = await signIn("credentials", {
+          redirect: false,
+          email: values.email,
+          password: values.password,
         });
-        router.push("/login");
+
+        if (signInResult?.error) {
+          toast.error("Login Failed", {
+            description: "Account created. Please sign in with your credentials.",
+          });
+          router.push("/login");
+        } else {
+          toast.success("You're in");
+          router.push("/dashboard");
+          router.refresh();
+        }
       } else {
         toast.error("Registration Failed", {
           description: result.error,

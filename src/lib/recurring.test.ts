@@ -5,6 +5,7 @@ import {
   advanceNextRun,
   fillMessage,
   formatNextRunLabel,
+  nextFutureRun,
   pausedDetail,
   periodOutcome,
   planActiveMessage,
@@ -22,6 +23,19 @@ describe("recurring plans", () => {
       advanceNextRun(from, "WEEKLY").toISOString(),
       "2026-10-01T13:00:00.000Z",
     );
+  });
+
+  it("collapses missed periods onto the next future run", () => {
+    const now = new Date("2026-09-24T13:00:00.000Z");
+    assert.equal(
+      nextFutureRun(new Date("2026-09-17T13:00:00.000Z"), "WEEKLY", now).toISOString(),
+      "2026-10-01T13:00:00.000Z",
+    );
+    const skipped = nextFutureRun(new Date("2026-01-01T00:00:00.000Z"), "DAILY", now);
+    const step = 86_400_000;
+    assert.ok(skipped.getTime() > now.getTime());
+    assert.equal((skipped.getTime() - Date.parse("2026-01-01T00:00:00.000Z")) % step, 0);
+    assert.ok(skipped.getTime() - now.getTime() <= step);
   });
 
   it("formats the create toast, fill toast, and plan row", () => {

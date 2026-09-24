@@ -43,7 +43,7 @@ const seenToasts = new Set<string>();
 function announceFills(toastId: string | null, messages: string[]) {
   if (!toastId || messages.length === 0 || seenToasts.has(toastId)) return;
   seenToasts.add(toastId);
-  for (const message of messages) toast(message);
+  for (const message of messages) toast(message, { duration: 8000 });
 }
 
 export function RecurringFillToast({
@@ -54,9 +54,18 @@ export function RecurringFillToast({
   messages: string[];
 }) {
   useEffect(() => {
-    announceFills(toastId, messages);
+    const handle = window.setTimeout(() => announceFills(toastId, messages), 50);
+    return () => window.clearTimeout(handle);
   }, [toastId, messages]);
-  return null;
+  if (messages.length === 0) return null;
+  return (
+    <p
+      role="status"
+      className="rounded-[8px] border border-[#22c55e]/35 bg-[#343434] px-3.5 py-3 text-xs font-medium text-[#fbfbfb]"
+    >
+      {messages[messages.length - 1]}
+    </p>
+  );
 }
 
 function parseAmount(value: string) {
@@ -82,10 +91,6 @@ export function RecurringPlans({
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const parsed = parseAmount(amount);
-
-  useEffect(() => {
-    announceFills(toastId, fills);
-  }, [toastId, fills]);
 
   useEffect(() => {
     let stopped = false;
@@ -251,6 +256,11 @@ export function RecurringPlans({
           })
         )}
       </div>
+      {fills.length > 0 ? (
+        <div className="mt-2.5">
+          <RecurringFillToast toastId={toastId} messages={fills} />
+        </div>
+      ) : null}
 
       {open ? (
         <div
@@ -263,7 +273,7 @@ export function RecurringPlans({
             aria-labelledby="new-recurring-buy"
             onClick={(event) => event.stopPropagation()}
             onSubmit={onCreate}
-            className="flex w-full max-w-[380px] flex-col gap-2.5 rounded-[10px] border border-white/10 bg-[#343434] p-3.5"
+            className="flex max-h-[calc(100vh-2rem)] w-full max-w-[380px] flex-col gap-2.5 overflow-y-auto rounded-[10px] border border-white/10 bg-[#343434] p-3.5"
           >
             <div className="flex items-center justify-between">
               <h2

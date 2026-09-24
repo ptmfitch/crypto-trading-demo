@@ -26,14 +26,14 @@ Preconditions:
 
 - **Open the sheet.** On `/profile`, choose `Create a plan`. The dialog heading is `New recurring buy`. The asset combobox is `Asset`, the amount textbox is `Amount (USDT)`, and the cadence buttons are `Daily` and `Weekly`.
 - **Start the plan.** Leave BTC, `$50`, and `Weekly` selected, then choose `Start plan`. Wait for `Weekly $50 BTC plan active`. The row reads `BTC · $50 · Weekly` and `Active`. Trade history does not gain a row from this step.
-- **Make it due.** Set `nextRunAt` in this run's sqlite file to `2000-01-01 00:00:00`, then reload `/profile`. Wait for `Recurring buy filled · $50 BTC`. `tradesim-verify.sh wallet verify-user@example.com --port 4173` shows cash below `10000`, BTC above `0`, and `trades` `1`.
+- **Make it due.** Prisma stores `nextRunAt` as unix milliseconds. Set it about a minute in the past, then reload `/profile`. `sqlite3 "$DATABASE" "UPDATE RecurringPlan SET nextRunAt = (strftime('%s','now') - 60) * 1000 WHERE status = 'ACTIVE';"`. Wait for `Recurring buy filled · $50 BTC`. `tradesim-verify.sh wallet verify-user@example.com --port 4173` shows cash down by 50, BTC above its previous value, and `trades` increased by 1. The row's next run moves forward. Do not set the timestamp to 1970: missed periods collapse to the next future run, but a fresh database should still move by one fill.
 - **Pause and resume.** Choose `Pause`. The pill reads `Paused` and the button reads `Resume`. Choose `Resume`. The pill reads `Active` again.
 - **Cancel.** Choose `Cancel`, then `Confirm cancel`. The row is gone and the empty line offers `Create a plan`.
 - **Proof.** After the fill, run `node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 snapshot --out .cursor/skills/verify-tradesim/artifacts/recurring-buy/filled.aria.txt` and `node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 screenshot --out .cursor/skills/verify-tradesim/artifacts/recurring-buy/filled.png`. Save the wallet stdout beside them.
 
 ## Gotchas
 
-- The first run is one cadence after create. A weekly plan does not buy until `nextRunAt` is due.
+- The first run is one cadence after create. A weekly plan does not buy until `nextRunAt` is due. Several missed periods become one fill and a future `nextRunAt`.
 - ETH and SOL plans can be saved. The paper wallet has no balance for them, so a due period advances with no trade.
 - A short USDT balance skips the period, advances `nextRunAt`, and does not toast.
 - A stale BTC quote leaves the period due and does not buy.

@@ -3,8 +3,8 @@ import { assertTradableQuote } from "@/lib/btc-quote";
 import { getBtcQuote } from "@/lib/btc-market";
 import prisma from "@/lib/prisma";
 import {
-  advanceNextRun,
   fillMessage,
+  nextFutureRun,
   periodOutcome,
   type RecurringAssetId,
   type RecurringCadence,
@@ -49,7 +49,7 @@ async function runPlan(
     return { fill: null, changed: false };
   }
 
-  const advanced = advanceNextRun(plan.nextRunAt, plan.cadence);
+  const advanced = nextFutureRun(plan.nextRunAt, plan.cadence, now);
   if (plan.assetId !== "bitcoin" || price == null) {
     const changed = await claimPeriod(plan, advanced);
     return { fill: null, changed };

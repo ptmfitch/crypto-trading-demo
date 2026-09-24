@@ -60,6 +60,18 @@ export function advanceNextRun(from: Date, cadence: RecurringCadence): Date {
   return new Date(from.getTime() + cadenceDays(cadence) * DAY_MS);
 }
 
+// One fill per tick. Missed periods collapse onto the next run after `now`
+// so an overdue plan does not buy once per poll until it catches up.
+export function nextFutureRun(
+  scheduled: Date,
+  cadence: RecurringCadence,
+  now: Date,
+): Date {
+  const step = cadenceDays(cadence) * DAY_MS;
+  const periods = Math.floor((now.getTime() - scheduled.getTime()) / step) + 1;
+  return new Date(scheduled.getTime() + Math.max(1, periods) * step);
+}
+
 export function formatPlanAmount(amount: number): string {
   const rounded = Math.round(amount * 100) / 100;
   return Number.isInteger(rounded) ? `$${rounded}` : `$${rounded.toFixed(2)}`;

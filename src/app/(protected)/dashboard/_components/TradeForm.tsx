@@ -23,6 +23,12 @@ const formSchema = z.object({
     .positive({ message: "Amount must be greater than 0" }),
 });
 
+const BUY_PRESETS = [100, 500, 1000] as const;
+
+function amountsEqual(a: number, b: number, decimals = 2): boolean {
+  return parseFloat(a.toFixed(decimals)) === parseFloat(b.toFixed(decimals));
+}
+
 interface TradeFormProps {
   initialBtcPrice: number | null;
   quoteStatus: BtcQuoteStatus;
@@ -66,19 +72,27 @@ export function TradeForm({
         : amount * btcPrice
       : 0;
 
-  // Function to handle quick percentage clicks
+  const handleDollarClick = (preset: number) => {
+    form.setValue("amount", parseFloat(preset.toFixed(2)));
+  };
+
+  const handleMaxClick = () => {
+    form.setValue("amount", parseFloat(usdtBalance.toFixed(2)));
+  };
+
   const handlePercentageClick = (percentage: number) => {
-    if (tradeType === "SELL" && percentage === 1) {
-      // For 100% sell, use the exact btcBalance
+    if (percentage === 1) {
       form.setValue("amount", parseFloat(btcBalance.toFixed(8)));
     } else {
-      const value = spendBalance * percentage;
-      form.setValue(
-        "amount",
-        parseFloat(value.toFixed(spendAsset === "USDT" ? 2 : 8))
-      );
+      const value = btcBalance * percentage;
+      form.setValue("amount", parseFloat(value.toFixed(8)));
     }
   };
+
+  const maxSelected =
+    tradeType === "BUY" &&
+    usdtBalance > 0 &&
+    amountsEqual(amount, usdtBalance);
 
   // Refetch price periodically. A failed refresh keeps the last quote and
   // marks it delayed instead of clearing the form.
@@ -176,7 +190,9 @@ export function TradeForm({
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           {/* --- SPEND INPUT --- */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">You Pay</label>
+            <label className="text-sm font-medium">
+              {tradeType === "BUY" ? "You spend (USDT)" : "You Pay"}
+            </label>
             <div className="relative">
               <Input
                 type="number"
@@ -194,20 +210,58 @@ export function TradeForm({
                 Available: {spendBalance.toFixed(spendAsset === "USDT" ? 2 : 6)}{" "}
                 {spendAsset}
               </span>
-              <div className="space-x-1">
+              {tradeType === "BUY" ? (
+                <span className="text-xs text-muted-foreground">Quick buy</span>
+              ) : null}
+            </div>
+            {tradeType === "BUY" ? (
+              <div className="grid grid-cols-4 gap-2">
+                {BUY_PRESETS.map((preset) => {
+                  const disabled = usdtBalance < preset;
+                  const selected =
+                    !disabled &&
+                    !maxSelected &&
+                    amountsEqual(amount, preset);
+                  return (
+                    <Button
+                      key={preset}
+                      type="button"
+                      size="sm"
+                      variant={selected ? "default" : "outline"}
+                      disabled={disabled}
+                      className="w-full"
+                      onClick={() => handleDollarClick(preset)}
+                    >
+                      ${preset.toLocaleString()}
+                    </Button>
+                  );
+                })}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={maxSelected ? "default" : "outline"}
+                  disabled={usdtBalance <= 0}
+                  className="w-full"
+                  onClick={handleMaxClick}
+                >
+                  Max
+                </Button>
+              </div>
+            ) : (
+              <div className="flex justify-end gap-1">
                 {[25, 50, 100].map((p) => (
                   <Button
                     key={p}
                     type="button"
                     size="sm"
                     variant="ghost"
-                    onClick={() => handlePercentageClick(p / 1000)}
+                    onClick={() => handlePercentageClick(p / 100)}
                   >
                     {p}%
                   </Button>
                 ))}
               </div>
-            </div>
+            )}
           </div>
 
           {/* --- RECEIVE DISPLAY --- */}

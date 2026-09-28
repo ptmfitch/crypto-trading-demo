@@ -198,7 +198,7 @@ export function TradeForm({
                 type="number"
                 step="any"
                 className="pr-16 text-lg"
-                {...form.register("amount")}
+                {...form.register("amount", { valueAsNumber: true })}
                 placeholder="0.00"
               />
               <span className="absolute inset-y-0 right-4 flex items-center text-muted-foreground font-semibold">

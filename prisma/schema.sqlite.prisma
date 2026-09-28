@@ -1,12 +1,13 @@
-// prisma/schema.prisma
-// Dev database is local Postgres. schema.sqlite.prisma is the SQLite provider
-// used by the before tests and the verify skill's disposable file.
+// SQLite provider for the before tests and verify-tradesim disposable files.
+// Keep these models aligned with schema.prisma. Do not add @db.Decimal here:
+// SQLite has no NUMERIC native type, and Prisma stores Decimal as REAL.
 generator client {
     provider = "prisma-client-js"
+    output   = "../src/generated/sqlite"
 }
 
 datasource db {
-    provider = "postgresql"
+    provider = "sqlite"
     url      = env("DATABASE_URL")
 }
 
@@ -27,9 +28,8 @@ model User {
 model Wallet {
     id          String  @id @default(cuid())
     userId      String  @unique
-    // NUMERIC, not float. 65,30 covers the demo balances loaded from SQLite REAL.
-    usdtBalance Decimal @default(10000.00) @db.Decimal(65, 30)
-    btcBalance  Decimal @default(0.00) @db.Decimal(65, 30)
+    usdtBalance Decimal @default(10000.00)
+    btcBalance  Decimal @default(0.00)
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -38,9 +38,9 @@ model Trade {
     id           String   @id @default(cuid())
     userId       String
     type         String
-    btcAmount    Decimal  @db.Decimal(65, 30)
-    usdtAmount   Decimal  @db.Decimal(65, 30)
-    priceAtTrade Decimal  @db.Decimal(65, 30)
+    btcAmount    Decimal
+    usdtAmount   Decimal
+    priceAtTrade Decimal
     timestamp    DateTime @default(now())
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import prisma from "@/lib/prisma";
+import { countTrades, readWallet } from "@/lib/account-reads";
 import { DollarSign, ListChecks, TrendingUp, Wallet } from "lucide-react";
 import { redirect } from "next/navigation";
 
@@ -23,14 +23,14 @@ function portfolioValue(usdt: number, btc: number, usd: number | null) {
 }
 
 async function getDashboardData(userId: string) {
-  const wallet = await prisma.wallet.findUnique({ where: { userId } });
+  const wallet = await readWallet(userId);
   if (!wallet) {
     console.error("Dashboard Error: Wallet not found for user:", userId);
     return null;
   }
 
   const [tradeCount, quote] = await Promise.all([
-    prisma.trade.count({ where: { userId } }),
+    countTrades(userId),
     getBtcQuote(),
   ]);
 

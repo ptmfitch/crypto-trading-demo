@@ -7,7 +7,9 @@ description: Drive the TradeSim crypto trading demo in a browser and prove regis
 
 TradeSim is a Next.js demo at the repo root. A user registers, logs in, buys or sells BTC on the dashboard, and reads the profile report. Drive it with `drive.mjs` and the `tradesim-verify.sh` helper. The feature map in `features/` is the source of which paths count as verified.
 
-The helper starts a disposable instance. It does not use port 3000 or `prisma/dev.db`. Those belong to the shared local demo. Two verification instances can run together when each has its own port and its own sqlite file under `/tmp/tradesim-verify`.
+The helper starts a disposable instance. It does not use port 3000 or the shared Postgres database `crypto_trading_demo`. Those belong to the shared local demo. Two verification instances can run together when each has its own port and its own sqlite file under `/tmp/tradesim-verify`.
+
+The dev app's Prisma schema is Postgres. This helper still pushes `prisma/schema.sqlite.prisma` to its disposable file. `npm run db:generate` must already have written `src/generated/sqlite`, because a `file:` `DATABASE_URL` uses that client.
 
 ## Launch
 
@@ -17,7 +19,7 @@ From the repo root:
 .cursor/skills/verify-tradesim/scripts/tradesim-verify.sh launch --port 4173
 ```
 
-If 4173 is taken, pass another port other than 3000. The command creates `/tmp/tradesim-verify/run-<id>/`, runs `npx prisma db push` against `file:/tmp/tradesim-verify/run-<id>/dev.db`, and starts `npx next dev -p <port> -H 127.0.0.1` with a generated `AUTH_SECRET`, `DEV_LOGIN=true`, and `NEXT_PUBLIC_APP_URL` set to that origin.
+If 4173 is taken, pass another port other than 3000. The command creates `/tmp/tradesim-verify/run-<id>/`, runs `npx prisma db push --schema=prisma/schema.sqlite.prisma` against `file:/tmp/tradesim-verify/run-<id>/dev.db`, and starts `npx next dev -p <port> -H 127.0.0.1` with a generated `AUTH_SECRET`, `DEV_LOGIN=true`, and `NEXT_PUBLIC_APP_URL` set to that origin.
 
 Ready means `curl -sf http://127.0.0.1:<port>` contains `Welcome to TradeSim`, and the command printed `URL=`, `PID=`, and `DATABASE=`. The server log is `/tmp/tradesim-verify/run-<id>/server.log`.
 

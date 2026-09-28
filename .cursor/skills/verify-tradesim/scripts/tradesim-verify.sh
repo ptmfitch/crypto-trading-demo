@@ -165,7 +165,7 @@ EOF
 
   (
     cd "$REPO_ROOT"
-    npx prisma db push --skip-generate --accept-data-loss
+    npx prisma db push --schema=prisma/schema.sqlite.prisma --skip-generate --accept-data-loss
   ) >"$root/prisma.log" 2>&1
 
   # Double-fork into a new session so the dev server outlives this command.

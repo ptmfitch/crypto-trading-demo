@@ -5,7 +5,7 @@
 
 ![Demo](public/example.gif)
 
-A modern, full-stack demo trading platform for learning crypto trading, built with Next.js 15, React 19, TailwindCSS 4, ShadCN/UI, Next-Auth (Auth.js), Prisma, and SQLite (for local/demo). Production deployments can use PostgreSQL.
+A modern, full-stack demo trading platform for learning crypto trading, built with Next.js 15, React 19, TailwindCSS 4, ShadCN/UI, Next-Auth (Auth.js), Prisma, and local Postgres. `prisma/dev.db` is the sample snapshot loaded into that database.
 
 ---
 
@@ -43,13 +43,15 @@ A modern, full-stack demo trading platform for learning crypto trading, built wi
 - ShadCN/UI
 - Next-Auth (Auth.js)
 - Prisma ORM
-- SQLite (default for local/demo)
+- Local Postgres (Homebrew) for the dev server
+- SQLite snapshot `prisma/dev.db` for the sample data and before tests
 - CoinGecko API
 
 ## Prerequisites
 
 - **Node.js** v18 or later
 - **npm** v9 or later
+- **Postgres 16** locally (Homebrew `postgresql@16` is the setup this repo uses)
 
 ## Getting Started
 
@@ -68,15 +70,28 @@ npm install
 
 ### 3. Set up your database
 
-- By default, the app uses SQLite for local/demo development. No setup required.
-- For production, set your `DATABASE_URL` in `.env` to a PostgreSQL connection string.
-- Set a strong `AUTH_SECRET` in `.env`.
+Start local Postgres, create the dev database, and point `.env` at it. Homebrew trust auth needs your OS user in the URL. Do not commit `.env`.
+
+```bash
+brew services start postgresql@16
+createdb crypto_trading_demo
+```
+
+```env
+DATABASE_URL="postgresql://USER@127.0.0.1:5432/crypto_trading_demo"
+AUTH_SECRET="your-strong-secret"
+NEXTAUTH_URL="http://localhost:3000"
+```
 
 ### 4. Initialize the database
 
 ```bash
-npx prisma db push
+npm run db:generate
+npx prisma migrate deploy
+npm run db:load-demo
 ```
+
+`db:load-demo` copies users, wallets, and trades from `prisma/dev.db` when the database is empty. The SQLite before tests stay on a disposable file: `npm run test:sqlite`.
 
 ### 5. Run the development server
 
@@ -91,7 +106,7 @@ Visit [http://localhost:3000](http://localhost:3000) to use the app.
 Create a `.env` file in the root directory. Example:
 
 ```env
-DATABASE_URL="file:./prisma/dev.db" # or your PostgreSQL connection string
+DATABASE_URL="postgresql://USER@127.0.0.1:5432/crypto_trading_demo"
 AUTH_SECRET="your-strong-secret"
 NEXTAUTH_URL="http://localhost:3000"
 ```
@@ -126,7 +141,7 @@ Contributions are welcome! To contribute:
 
 ## Future Improvements
 
-- **Production-ready PostgreSQL support** (just update your `.env`)
+- **Hosted Postgres** for a deployed environment (the local dev database is already Postgres)
 - **Unit and integration tests** (Vitest, Playwright)
 - **User settings/profile editing**
 - **Multi-asset support (ETH, etc.)**

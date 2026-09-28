@@ -1,13 +1,13 @@
 ---
 name: start-tradesim
-description: Pull the latest main branch and start the shared local TradeSim demo (Next.js on port 3000 and the SQLite database via Prisma). Use when the user asks to pull the latest, start the app, boot the demo, or start related services for this repository.
+description: Pull the latest main branch and start the shared local TradeSim demo (Next.js on port 3000 and local Postgres via Prisma). Use when the user asks to pull the latest, start the app, boot the demo, or start related services for this repository.
 ---
 
 # Start TradeSim
 
-Start the shared local demo. Port 3000 and `prisma/dev.db` belong to that demo. The verification helper (`.cursor/skills/verify-tradesim`) is a different workflow: it uses another port and a disposable sqlite file. Do not launch it here.
+Start the shared local demo. Port 3000 and the local Postgres database `crypto_trading_demo` belong to that demo. The verification helper (`.cursor/skills/verify-tradesim`) is a different workflow: it uses another port and a disposable sqlite file. Do not launch it here.
 
-SQLite is a file. There is no database server, Docker, or other process to start.
+Postgres is Homebrew `postgresql@16`. Do not start Docker. If the service is stopped, run `brew services start postgresql@16`.
 
 ## Before pulling
 
@@ -32,11 +32,18 @@ Run `npm install` only when `node_modules` is missing, or when the pull changed 
 
 `.env` supplies `DATABASE_URL` and `AUTH_SECRET`. Do not print those values.
 
+`DATABASE_URL` points at local Postgres. Homebrew trust auth needs the OS user in the URL (`whoami`), for example `postgresql://USER@127.0.0.1:5432/crypto_trading_demo`. A URL with no user is rejected.
+
 ```bash
-npx prisma generate && npx prisma db push
+createdb crypto_trading_demo
+npm run db:generate
+npx prisma migrate deploy
+npm run db:load-demo
 ```
 
-"Already in sync" is success. Prisma reads `.env` from the repo root.
+Create the database once. `migrate deploy` applies `prisma/migrations`. `db:load-demo` copies the sample rows from `prisma/dev.db` when the database has no users. It leaves existing rows in place. `npm run db:load-demo -- --replace` reloads the snapshot.
+
+`prisma/dev.db` is the sample snapshot, not the database this server reads. `npm run test:sqlite` is the SQLite before-test path and uses a disposable file.
 
 ## Dev server
 
@@ -57,4 +64,4 @@ The demo is up when both are true:
 - `curl -sf -o /dev/null -w "%{http_code}" http://127.0.0.1:3000` prints `200`
 - The response body contains `Welcome to TradeSim`
 
-Report the commit `main` is on, whether the database was already in sync, and the URL `http://localhost:3000`.
+Report the commit `main` is on, whether `migrate deploy` applied cleanly, and the URL `http://localhost:3000`.

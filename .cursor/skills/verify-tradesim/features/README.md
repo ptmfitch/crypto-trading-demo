@@ -5,7 +5,7 @@ This directory is the maintained source for verifying the user-facing behavior o
 ## Baseline preconditions
 
 - Launch TradeSim with `.cursor/skills/verify-tradesim/scripts/tradesim-verify.sh launch --port 4173`.
-- Each run gets its own sqlite file under `/tmp/tradesim-verify/run-<id>/dev.db`. Do not use `prisma/dev.db` or port 3000.
+- Each run gets its own sqlite file under `/tmp/tradesim-verify/run-<id>/dev.db`, pushed from `prisma/schema.sqlite.prisma`. Do not use `prisma/dev.db`, the shared Postgres database, or port 3000.
 - Run `tradesim-verify.sh doctor --port 4173` and require the recorded pid, port, database, and landing text.
 - Never drive an instance that was not started by this verification run.
 - A fresh database has no users. Registration is the way to create the first account.

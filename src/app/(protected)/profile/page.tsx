@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import prisma from "@/lib/prisma";
+import { readProfileTrades } from "@/lib/account-reads";
 import {
   formatTradeHistoryBtc,
   formatTradeHistoryTotal,
@@ -74,10 +74,7 @@ export default async function ProfilePage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const trades = await prisma.trade.findMany({
-    where: { userId: session.user.id },
-    orderBy: { timestamp: "asc" },
-  });
+  const trades = await readProfileTrades(session.user.id);
 
   const pnlData = calculatePnlHistory(trades);
   const finalPnl = pnlData.length > 0 ? pnlData[pnlData.length - 1].pnl : 0;

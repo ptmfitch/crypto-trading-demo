@@ -6,7 +6,8 @@ Do not add customer names, client branding, or extra product names to docs or co
 ## Stack
 
 - Next.js 15 (App Router) + React 19 + TailwindCSS 4 + ShadCN/UI
-- Prisma + SQLite (`file:./prisma/dev.db`)
+- Prisma + local Postgres (Homebrew `postgresql@16`, database `crypto_trading_demo`)
+- SQLite `prisma/dev.db` is the sample snapshot and the before-test provider, not the database the dev server uses
 - NextAuth v5 **credentials** provider only (email + password)
 
 Do **not** add MongoDB, Docker, Stripe, or OAuth (including Google). Keep auth as credentials NextAuth.
@@ -15,16 +16,34 @@ Do **not** add MongoDB, Docker, Stripe, or OAuth (including Google). Keep auth a
 
 ```bash
 npm install
-DATABASE_URL="file:./prisma/dev.db" AUTH_SECRET="dev-secret-change-me" npx prisma db push
-DATABASE_URL="file:./prisma/dev.db" AUTH_SECRET="dev-secret-change-me" npm run dev
+brew services start postgresql@16
+createdb crypto_trading_demo
+npm run db:generate
+npx prisma migrate deploy
+npm run db:load-demo
+npm run dev
 ```
 
-Optional `.env` (do not commit secrets):
+`npm run db:load-demo` copies `prisma/dev.db` into Postgres the first time the database is empty. `npm run db:load-demo -- --replace` reloads that snapshot. Homebrew trust auth requires the OS user in the URL (`whoami`). Do not commit `.env`.
+
+Optional `.env`:
 
 ```env
-DATABASE_URL="file:./prisma/dev.db"
+DATABASE_URL="postgresql://USER@127.0.0.1:5432/crypto_trading_demo"
 AUTH_SECRET="dev-secret-change-me"
 NEXTAUTH_URL="http://localhost:3000"
+```
+
+SQLite before tests (disposable file, not `prisma/dev.db`):
+
+```bash
+npm run test:sqlite
+```
+
+Postgres tests load the sample snapshot, check user/wallet/trade counts and balances, then run the same behavior:
+
+```bash
+npm run test:postgres
 ```
 
 CoinGecko is optional. The app proxies BTC price through `/api/btc-price`. If CoinGecko is unreachable, the dashboard may fail to load live prices — do not add another market-data vendor.
@@ -34,7 +53,9 @@ CoinGecko is optional. The app proxies BTC price through `/api/btc-price`. If Co
 - `src/app/` — App Router pages (`/dashboard`, `/profile`, `/login`, `/register`)
 - `src/actions/` — server actions for credentials auth and trades
 - `src/auth.ts` — NextAuth credentials config
-- `prisma/schema.prisma` — SQLite models (`User`, `Wallet`, `Trade`)
+- `prisma/schema.prisma` — Postgres models (`User`, `Wallet`, `Trade`)
+- `prisma/schema.sqlite.prisma` — same models for the SQLite before tests and verify-tradesim
+- `prisma/dev.db` — sample snapshot loaded into local Postgres
 
 ## Working rules
 

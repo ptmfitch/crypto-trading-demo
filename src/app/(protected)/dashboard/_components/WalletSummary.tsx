@@ -49,7 +49,7 @@ export function WalletSummary({
   const totalPortfolioValue = usdtBalance + btcValueInUsd;
   const pnl = totalPortfolioValue - INITIAL_CAPITAL;
   const pnlPercentage = (pnl / INITIAL_CAPITAL) * 100;
-  const pnlColor = pnl >= 0 ? "text-green-500" : "text-red-500";
+  const pnlColor = pnl >= 0 ? "text-profit" : "text-loss";
 
   // Uncomment this block if you have a Skeleton component
   // if (isLoading) {

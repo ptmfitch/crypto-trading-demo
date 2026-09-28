@@ -92,7 +92,7 @@ export default async function DashboardPage() {
 
   const { wallet, quote, totalValue, pnl, tradeCount } = data;
   const pnlColor =
-    pnl == null ? "text-muted-foreground" : pnl >= 0 ? "text-green-500" : "text-red-500";
+    pnl == null ? "text-muted-foreground" : pnl >= 0 ? "text-profit" : "text-loss";
   const price = priceStat(quote.status, quote.usd);
   const portfolioDescription =
     quote.status === "stale"

@@ -1,0 +1,18 @@
+feature: acp-95
+entry: /login and /dashboard
+url: http://127.0.0.1:4188
+port: 4188
+
+light inputs (login email/password, dashboard You Pay and You Receive):
+border oklch(0.64 0 0) = rgb(140, 140, 140)
+card oklch(1 0 0) = rgb(255, 255, 255)
+contrast 3.36:1
+
+dark inputs (same fields, theme set to Dark from the header menu):
+border oklch(0.55 0 0) = rgb(113, 113, 113)
+card oklch(0.205 0 0) = rgb(23, 23, 23)
+contrast 3.67:1
+
+theme menu on /dashboard:
+prefers-reduced-motion: reduce → animation none, duration 0s
+prefers-reduced-motion: no-preference → animation 0.15s enter

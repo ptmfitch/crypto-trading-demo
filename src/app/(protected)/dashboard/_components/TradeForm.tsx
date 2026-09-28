@@ -26,7 +26,7 @@ import {
 } from "@/lib/form-errors";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useId, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -55,6 +55,7 @@ export function TradeForm({
   const [tradeType, setTradeType] = useState<"BUY" | "SELL">("BUY");
   const [isPending, startTransition] = useTransition();
   const receiveFieldId = useId();
+  const amountRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<z.infer<typeof tradeAmountSchema>>({
     resolver: zodResolver(tradeAmountSchema),
@@ -77,16 +78,18 @@ export function TradeForm({
 
   // Function to handle quick percentage clicks
   const handlePercentageClick = (percentage: number) => {
-    if (tradeType === "SELL" && percentage === 1) {
-      // For 100% sell, use the exact btcBalance
-      form.setValue("amount", parseFloat(btcBalance.toFixed(8)));
-    } else {
-      const value = spendBalance * percentage;
-      form.setValue(
-        "amount",
-        parseFloat(value.toFixed(spendAsset === "USDT" ? 2 : 8))
-      );
+    const next =
+      tradeType === "SELL" && percentage === 1
+        ? // For 100% sell, use the exact btcBalance
+          parseFloat(btcBalance.toFixed(8))
+        : parseFloat(
+            (spendBalance * percentage).toFixed(spendAsset === "USDT" ? 2 : 8)
+          );
+    // The amount input is uncontrolled, so the DOM value has to be set too.
+    if (amountRef.current) {
+      amountRef.current.value = String(next);
     }
+    form.setValue("amount", next, { shouldValidate: true });
   };
 
   // Refetch price periodically. A failed refresh keeps the last quote and
@@ -148,6 +151,9 @@ export function TradeForm({
       if (result.success) {
         toast.success(result.success);
         form.reset({ amount: 0 });
+        if (amountRef.current) {
+          amountRef.current.value = "0";
+        }
       } else {
         toast.error(result.error);
         const fieldError = balanceFieldError(result.error);
@@ -204,12 +210,22 @@ export function TradeForm({
                 <FormLabel>You Pay</FormLabel>
                 <div className="relative">
                   <FormControl>
+                    {/* Uncontrolled so a trailing "." stays put. Binding value
+                        rewrites the number input on the validation re-render
+                        and the in-progress decimal disappears. */}
                     <Input
                       type="number"
                       step="any"
                       className="pr-16 text-lg"
                       placeholder="0.00"
-                      {...field}
+                      name={field.name}
+                      defaultValue={0}
+                      onBlur={field.onBlur}
+                      onChange={field.onChange}
+                      ref={(node) => {
+                        amountRef.current = node;
+                        field.ref(node);
+                      }}
                     />
                   </FormControl>
                   <span className="absolute inset-y-0 right-4 flex items-center text-muted-foreground font-semibold">

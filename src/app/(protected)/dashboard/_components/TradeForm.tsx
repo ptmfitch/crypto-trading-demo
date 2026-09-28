@@ -10,11 +10,11 @@ import {
   quoteDelayLabel,
   type BtcQuoteStatus,
 } from "@/lib/btc-quote";
+import { showStatusError, showStatusSuccess } from "@/lib/status-toast";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 
 const formSchema = z.object({
@@ -126,7 +126,7 @@ export function TradeForm({
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     if (!quoteReady) {
-      toast.error("Trading is paused until a live BTC quote returns.");
+      showStatusError("Trading is paused until a live BTC quote returns.");
       return;
     }
     startTransition(async () => {
@@ -137,10 +137,10 @@ export function TradeForm({
       };
       const result = await executeTrade(payload);
       if (result.success) {
-        toast.success(result.success);
+        showStatusSuccess(result.success);
         form.reset({ amount: 0 });
-      } else {
-        toast.error(result.error);
+      } else if (result.error) {
+        showStatusError(result.error);
       }
     });
   }

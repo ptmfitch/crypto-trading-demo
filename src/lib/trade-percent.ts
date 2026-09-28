@@ -1,15 +1,16 @@
 export type SpendAsset = "USDT" | "BTC";
 
-// 100% of BTC keeps the wallet's stored precision. A rounded product can
-// leave a remainder the sell path then rejects as insufficient balance.
+// toFixed rounds half-up, so a 100% fill can exceed the wallet. Execution
+// compares that amount to the unrounded balance and rejects the trade.
 export function percentPayAmount(
   balance: number,
   percent: number,
   asset: SpendAsset,
 ): number {
-  if (asset === "BTC" && percent === 100) {
-    return parseFloat(balance.toFixed(8));
-  }
   const digits = asset === "USDT" ? 2 : 8;
-  return parseFloat((balance * (percent / 100)).toFixed(digits));
+  const portion = balance * (percent / 100);
+  const rounded = parseFloat(portion.toFixed(digits));
+  if (rounded <= balance) return rounded;
+  const factor = 10 ** digits;
+  return Math.min(Math.floor(portion * factor) / factor, balance);
 }

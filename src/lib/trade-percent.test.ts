@@ -18,7 +18,11 @@ describe("percentPayAmount", () => {
     assert.equal(percentPayAmount(USDT_BALANCE, 100, "USDT"), 10000);
   });
 
-  it("fills 100% of a known BTC balance without rounding away the remainder", () => {
-    assert.equal(percentPayAmount(0.123456789, 100, "BTC"), 0.12345679);
+  it("fills 100% of a BTC balance without exceeding it", () => {
+    assert.equal(percentPayAmount(0.123456789, 100, "BTC"), 0.12345678);
+  });
+
+  it("fills 100% of a USDT balance without rounding above it", () => {
+    assert.equal(percentPayAmount(10000.006, 100, "USDT"), 10000);
   });
 });

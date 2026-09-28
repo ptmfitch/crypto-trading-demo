@@ -25,6 +25,7 @@ import {
   bitcoinChartName,
   btcChartRangeLabel,
   btcChartRanges,
+  chartChangeSummary,
   chartRangeName,
   formatBtcAxisTick,
   formatChartDate,
@@ -154,7 +155,7 @@ export function BtcPriceChart() {
   const summary =
     data.length === 0
       ? "Chart unavailable"
-      : `${isPositiveChange ? "Increased" : "Decreased"} by $${priceChange.value.toFixed(2)} (${priceChange.percent.toFixed(2)}%)`;
+      : chartChangeSummary(priceChange.value, priceChange.percent);
 
   return (
     <Card>

@@ -6,6 +6,7 @@ import {
   btcChartRangeLabel,
   chartRangeName,
   formatBtcAxisTick,
+  chartChangeSummary,
   formatChartDate,
   formatChartPrice,
 } from "./btc-chart.ts";
@@ -42,6 +43,16 @@ describe("bitcoin chart name and range", () => {
       assert.equal(name.includes(label), true);
       assert.equal(name.includes("Select a value"), false);
     }
+  });
+});
+
+describe("chart change summary", () => {
+  it("states the direction once", () => {
+    assert.equal(chartChangeSummary(5260.48, 6.78), "Increased by $5260.48 (6.78%)");
+    assert.equal(
+      chartChangeSummary(-1441.23, -1.71),
+      "Decreased by $1441.23 (1.71%)",
+    );
   });
 });
 

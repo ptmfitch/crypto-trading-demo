@@ -40,6 +40,12 @@ export function formatChartDate(value: string | number) {
   }).format(date);
 }
 
+export function chartChangeSummary(changeValue: number, changePercent: number) {
+  const increased = changeValue >= 0;
+  const direction = increased ? "Increased" : "Decreased";
+  return `${direction} by $${Math.abs(changeValue).toFixed(2)} (${Math.abs(changePercent).toFixed(2)}%)`;
+}
+
 export function formatChartPrice(value: number) {
   return `$${Number(value).toLocaleString("en-US", {
     minimumFractionDigits: 2,

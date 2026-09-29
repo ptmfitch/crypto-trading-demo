@@ -4,12 +4,12 @@ import { auth } from "@/auth";
 import { getBtcQuote } from "@/lib/btc-market";
 import {
   BITCOIN_ASSET_ID,
+  MAX_ACTIVE_ALERTS,
   createPriceAlertError,
   duePriceAlerts,
   isAlertDirection,
   priceAlertCrossedMessage,
   type ActivePriceAlert,
-  type AlertDirection,
 } from "@/lib/price-alert";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
@@ -27,6 +27,7 @@ export async function listActivePriceAlerts(): Promise<ActivePriceAlert[]> {
   const rows = await prisma.priceAlert.findMany({
     where: { userId: session.user.id, status: "ACTIVE" },
     orderBy: { createdAt: "desc" },
+    take: MAX_ACTIVE_ALERTS,
   });
 
   const alerts: ActivePriceAlert[] = [];
@@ -49,21 +50,39 @@ export async function createPriceAlert(input: {
   const session = await auth();
   if (!session?.user?.id) return { error: "Not authenticated" };
 
-  const activeCount = await prisma.priceAlert.count({
-    where: { userId: session.user.id, status: "ACTIVE" },
-  });
-  const error = createPriceAlertError(input, activeCount);
-  if (error) return { error };
+  const validationError = createPriceAlertError(input, 0);
+  if (validationError) return { error: validationError };
 
-  await prisma.priceAlert.create({
-    data: {
-      userId: session.user.id,
-      assetId: BITCOIN_ASSET_ID,
-      direction: input.direction as AlertDirection,
-      thresholdUsd: new Prisma.Decimal(input.thresholdUsd),
-      status: "ACTIVE",
-    },
-  });
+  const userId = session.user.id;
+  // Count and insert are one statement, so concurrent creates cannot all
+  // observe a count below the cap and each insert a row.
+  const inserted = await prisma.$executeRaw`
+    INSERT INTO "PriceAlert" (
+      "id",
+      "userId",
+      "assetId",
+      "direction",
+      "thresholdUsd",
+      "status",
+      "createdAt"
+    )
+    SELECT
+      ${crypto.randomUUID()},
+      ${userId},
+      ${BITCOIN_ASSET_ID},
+      ${input.direction},
+      ${new Prisma.Decimal(input.thresholdUsd)},
+      ${"ACTIVE"},
+      ${Date.now()}
+    WHERE (
+      SELECT COUNT(*) FROM "PriceAlert"
+      WHERE "userId" = ${userId} AND "status" = ${"ACTIVE"}
+    ) < ${MAX_ACTIVE_ALERTS}
+  `;
+  if (inserted !== 1) {
+    const capError = createPriceAlertError(input, MAX_ACTIVE_ALERTS);
+    return { error: capError ?? "You can have at most 20 active alerts." };
+  }
   revalidateAlerts();
   return { success: true };
 }
@@ -91,6 +110,7 @@ export async function tickPriceAlerts(): Promise<{
 
   const rows = await prisma.priceAlert.findMany({
     where: { userId: session.user.id, status: "ACTIVE" },
+    take: MAX_ACTIVE_ALERTS,
   });
   if (rows.length === 0) return { fired: [] };
 

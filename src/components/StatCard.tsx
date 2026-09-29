@@ -7,6 +7,7 @@ interface StatCardProps {
   title: string;
   value: string;
   icon: LucideIcon;
+  secondary?: string;
   description?: string;
   color?: string;
   href?: string;
@@ -16,6 +17,7 @@ export function StatCard({
   title,
   value,
   icon: Icon,
+  secondary,
   description,
   color,
   href,
@@ -32,6 +34,9 @@ export function StatCard({
       </CardHeader>
       <CardContent>
         <div className={`text-2xl font-bold ${color ?? ""}`}>{value}</div>
+        {secondary && (
+          <p className="text-sm text-muted-foreground">{secondary}</p>
+        )}
         {description && (
           <p className="text-xs text-muted-foreground">{description}</p>
         )}

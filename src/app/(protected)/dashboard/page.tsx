@@ -1,12 +1,11 @@
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
-import { DollarSign, ListChecks, TrendingUp, Wallet } from "lucide-react";
 import { redirect } from "next/navigation";
 
-import { StatCard } from "@/components/StatCard";
 import { getBtcQuote } from "@/lib/btc-market";
-import { quoteDelayLabel, type BtcQuoteStatus } from "@/lib/btc-quote";
+import { quoteDelayLabel, type BtcQuoteStatus, usdToGbpAmount } from "@/lib/btc-quote";
 import { BtcPriceChart } from "./_components/BtcPriceChart";
+import { DashboardStats } from "./_components/DashboardStats";
 import { TradeForm } from "./_components/TradeForm";
 
 function formatUsd(value: number) {
@@ -14,6 +13,19 @@ function formatUsd(value: number) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+function formatGbp(value: number) {
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "GBP",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function formatGbpSigned(value: number) {
+  return `${value >= 0 ? "+" : ""}${formatGbp(value)}`;
 }
 
 function portfolioValue(usdt: number, btc: number, usd: number | null) {
@@ -94,6 +106,10 @@ export default async function DashboardPage() {
   const pnlColor =
     pnl == null ? "text-muted-foreground" : pnl >= 0 ? "text-green-500" : "text-red-500";
   const price = priceStat(quote.status, quote.usd);
+  const gbpAvailable = quote.gbp != null;
+  const portfolioGbp =
+    totalValue == null ? null : usdToGbpAmount(totalValue, quote);
+  const pnlGbp = pnl == null ? null : usdToGbpAmount(pnl, quote);
   const portfolioDescription =
     quote.status === "stale"
       ? "Includes a delayed BTC quote"
@@ -113,41 +129,25 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-6">
-          <StatCard
-            title="Portfolio Value"
-            value={totalValue == null ? "—" : formatUsd(totalValue)}
-            icon={Wallet}
-            description={portfolioDescription}
-          />
-          <StatCard
-            title="Total P&L"
-            value={
-              pnl == null
-                ? "—"
-                : `${pnl >= 0 ? "+" : ""}${formatUsd(pnl)}`
-            }
-            icon={TrendingUp}
-            color={pnlColor}
-            href="/profile"
-            description={
-              quote.status === "stale" ? "Includes a delayed BTC quote" : undefined
-            }
-          />
-          <StatCard
-            title="Live BTC Price"
-            value={price.value}
-            icon={DollarSign}
-            color={price.color}
-            description={price.description}
-          />
-          <StatCard
-            title="Total Trades"
-            value={tradeCount.toString()}
-            icon={ListChecks}
-            href="/profile"
-          />
-        </div>
+        <DashboardStats
+          portfolioValue={totalValue == null ? "—" : formatUsd(totalValue)}
+          portfolioGbp={portfolioGbp == null ? null : formatGbp(portfolioGbp)}
+          portfolioDescription={portfolioDescription}
+          pnlValue={
+            pnl == null ? "—" : `${pnl >= 0 ? "+" : ""}${formatUsd(pnl)}`
+          }
+          pnlGbp={pnlGbp == null ? null : formatGbpSigned(pnlGbp)}
+          pnlColor={pnlColor}
+          pnlDescription={
+            quote.status === "stale" ? "Includes a delayed BTC quote" : undefined
+          }
+          priceValue={price.value}
+          priceGbp={quote.gbp == null ? null : formatGbp(quote.gbp)}
+          priceColor={price.color}
+          priceDescription={price.description}
+          tradeCount={tradeCount.toString()}
+          gbpAvailable={gbpAvailable}
+        />
 
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">

@@ -3,6 +3,10 @@
 import { auth } from "@/auth";
 import { assertTradableQuote } from "@/lib/btc-quote";
 import { getBtcQuote } from "@/lib/btc-market";
+import {
+  INSUFFICIENT_BTC_BALANCE,
+  INSUFFICIENT_USDT_BALANCE,
+} from "@/lib/form-errors";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -52,7 +56,7 @@ export async function executeTrade(values: z.infer<typeof TradeSchema>) {
 
       if (tradeType === "BUY") {
         if (wallet.usdtBalance.lt(usdtAmount))
-          throw new Error("Insufficient USDT balance.");
+          throw new Error(INSUFFICIENT_USDT_BALANCE);
         await tx.wallet.update({
           where: { userId },
           data: {
@@ -62,7 +66,7 @@ export async function executeTrade(values: z.infer<typeof TradeSchema>) {
         });
       } else {
         if (wallet.btcBalance.lt(btcAmount))
-          throw new Error("Insufficient BTC balance.");
+          throw new Error(INSUFFICIENT_BTC_BALANCE);
         await tx.wallet.update({
           where: { userId },
           data: {

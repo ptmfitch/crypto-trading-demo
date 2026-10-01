@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { TestAccount } from "@/lib/dev-login";
+import { LOGIN_FAILED_ERROR } from "@/lib/form-errors";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
@@ -65,6 +66,11 @@ export default function LoginForm({
       });
 
       if (result?.error) {
+        form.setError(
+          "password",
+          { message: LOGIN_FAILED_ERROR },
+          { shouldFocus: true }
+        );
         toast.error("Login Failed", {
           description: "Please check your email and password.",
         });

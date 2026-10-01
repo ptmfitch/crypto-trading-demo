@@ -8,6 +8,7 @@ export async function GET() {
   return NextResponse.json({
     bitcoin: {
       usd: quote.usd,
+      gbp: quote.gbp,
       usd_24h_change: quote.usd24hChange,
     },
     quote: {

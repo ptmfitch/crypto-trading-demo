@@ -10,7 +10,7 @@ import {
 } from "@/lib/btc-quote";
 
 const PRICE_URL =
-  "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true";
+  "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd,gbp&include_24hr_change=true";
 const CHART_URL =
   "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=";
 const CHART_FRESH_TTL_MS = 900_000;
@@ -83,6 +83,7 @@ function readPriceCache(): CachedQuote | null {
   }
   return {
     usd: row.usd,
+    gbp: typeof row.gbp === "number" ? row.gbp : null,
     usd24hChange:
       typeof row.usd24hChange === "number" ? row.usd24hChange : null,
     fetchedAt: row.fetchedAt,
@@ -92,6 +93,7 @@ function readPriceCache(): CachedQuote | null {
 function strip(quote: ResolvedQuote): BtcQuote {
   return {
     usd: quote.usd,
+    gbp: quote.gbp,
     usd24hChange: quote.usd24hChange,
     status: quote.status,
     fetchedAt: quote.fetchedAt,
@@ -107,14 +109,16 @@ async function fetchCoinGeckoPrice(): Promise<UpstreamQuote> {
     });
     if (!response.ok) return { ok: false };
     const data = (await response.json()) as {
-      bitcoin?: { usd?: unknown; usd_24h_change?: unknown };
+      bitcoin?: { usd?: unknown; gbp?: unknown; usd_24h_change?: unknown };
     };
     const usd = data.bitcoin?.usd;
+    const gbp = data.bitcoin?.gbp;
     const change = data.bitcoin?.usd_24h_change;
     if (typeof usd !== "number") return { ok: false };
     return {
       ok: true,
       usd,
+      gbp: typeof gbp === "number" ? gbp : null,
       usd24hChange: typeof change === "number" ? change : null,
     };
   } catch (error) {

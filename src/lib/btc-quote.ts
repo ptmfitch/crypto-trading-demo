@@ -7,22 +7,42 @@ export type BtcQuoteStatus = "fresh" | "stale" | "unavailable";
 
 export type CachedQuote = {
   usd: number;
+  gbp: number | null;
   usd24hChange: number | null;
   fetchedAt: number;
 };
 
 export type UpstreamQuote =
-  | { ok: true; usd: number; usd24hChange: number | null }
+  | { ok: true; usd: number; gbp: number | null; usd24hChange: number | null }
   | { ok: false };
 
 export type ResolvedQuote = {
   usd: number | null;
+  gbp: number | null;
   usd24hChange: number | null;
   status: BtcQuoteStatus;
   fetchedAt: number | null;
   ageMs: number | null;
   nextCache: CachedQuote | null;
 };
+
+function usableGbp(value: number | null | undefined): number | null {
+  if (value == null || !Number.isFinite(value) || value <= 0) return null;
+  return value;
+}
+
+export function usdToGbpAmount(
+  usdAmount: number | null,
+  quote: { usd: number | null; gbp: number | null }
+): number | null {
+  if (usdAmount == null) return null;
+  const usd = quote.usd;
+  const gbp = quote.gbp;
+  if (usd == null || gbp == null) return null;
+  if (!Number.isFinite(usd) || usd <= 0) return null;
+  if (!Number.isFinite(gbp) || gbp <= 0) return null;
+  return usdAmount * (gbp / usd);
+}
 
 export function quoteDelayLabel(status: BtcQuoteStatus): string | null {
   switch (status) {
@@ -71,6 +91,7 @@ function usableCache(
   const change = cached.usd24hChange;
   return {
     usd: cached.usd,
+    gbp: usableGbp(cached.gbp),
     usd24hChange: change != null && Number.isFinite(change) ? change : null,
     fetchedAt: cached.fetchedAt,
   };
@@ -82,6 +103,7 @@ function usableUpstream(upstream: UpstreamQuote): CachedQuote | null {
   const change = upstream.usd24hChange;
   return {
     usd: upstream.usd,
+    gbp: usableGbp(upstream.gbp),
     usd24hChange: change != null && Number.isFinite(change) ? change : null,
     fetchedAt: 0,
   };
@@ -99,6 +121,7 @@ export function resolveBtcQuote(input: {
     const nextCache = { ...upstream, fetchedAt: input.now };
     return {
       usd: nextCache.usd,
+      gbp: nextCache.gbp,
       usd24hChange: nextCache.usd24hChange,
       status: "fresh",
       fetchedAt: input.now,
@@ -113,6 +136,7 @@ export function resolveBtcQuote(input: {
       input.upstream === null && ageMs < FRESH_TTL_MS ? "fresh" : "stale";
     return {
       usd: cached.usd,
+      gbp: cached.gbp,
       usd24hChange: cached.usd24hChange,
       status,
       fetchedAt: cached.fetchedAt,
@@ -123,6 +147,7 @@ export function resolveBtcQuote(input: {
 
   return {
     usd: null,
+    gbp: null,
     usd24hChange: null,
     status: "unavailable",
     fetchedAt: null,

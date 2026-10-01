@@ -46,7 +46,7 @@ export function PortfolioPnlChart({ data }: { data: PnlDataPoint[] }) {
     <Card>
       <CardHeader>
         <CardTitle>Portfolio Performance</CardTitle>
-        <CardDescription>
+        <CardDescription id="portfolio-pnl-summary">
           Your portfolio&apos;s profit and loss over time.
         </CardDescription>
       </CardHeader>
@@ -55,7 +55,13 @@ export function PortfolioPnlChart({ data }: { data: PnlDataPoint[] }) {
           config={chartConfig}
           className="aspect-auto h-[250px] w-full"
         >
-          <AreaChart data={data}>
+          <AreaChart
+            data={data}
+            title="Portfolio profit and loss"
+            aria-label="Portfolio profit and loss"
+            aria-describedby="portfolio-pnl-summary"
+            desc="Your portfolio's profit and loss over time."
+          >
             <defs>
               <linearGradient id="fillGreen" x1="0" y1="0" x2="0" y2="1">
                 <stop

@@ -81,7 +81,7 @@ export default async function ProfilePage() {
 
   const pnlData = calculatePnlHistory(trades);
   const finalPnl = pnlData.length > 0 ? pnlData[pnlData.length - 1].pnl : 0;
-  const pnlColor = finalPnl >= 0 ? "text-green-500" : "text-red-500";
+  const pnlColor = finalPnl >= 0 ? "text-profit" : "text-loss";
   const hasSufficientDataForChart = pnlData && pnlData.length > 1;
   const { winRate, bestTradePnl, worstTradePnl } = calculateAdvancedStats(
     trades,
@@ -136,18 +136,18 @@ export default async function ProfilePage() {
                   <span className="font-semibold">{trades.length}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground text-green-500">
+                  <span className="text-profit">
                     Best Trade
                   </span>{" "}
-                  <span className="font-semibold text-green-500">
+                  <span className="font-semibold text-profit">
                     +${bestTradePnl.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground text-red-500">
+                  <span className="text-loss">
                     Worst Trade
                   </span>{" "}
-                  <span className="font-semibold text-red-500">
+                  <span className="font-semibold text-loss">
                     -${Math.abs(worstTradePnl).toFixed(2)}
                   </span>
                 </div>

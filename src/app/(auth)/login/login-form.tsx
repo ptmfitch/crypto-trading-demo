@@ -155,6 +155,7 @@ export default function LoginForm({
                         type="email"
                         placeholder="you@example.com"
                         {...field}
+                        autoComplete="username"
                       />
                     </FormControl>
                     <FormMessage />
@@ -172,6 +173,7 @@ export default function LoginForm({
                         type="password"
                         placeholder="••••••••"
                         {...field}
+                        autoComplete="current-password"
                       />
                     </FormControl>
                     <FormMessage />

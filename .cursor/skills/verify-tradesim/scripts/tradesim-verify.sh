@@ -349,7 +349,7 @@ cmd_wallet() {
   sqlite3 "$DATABASE" <<SQL
 .headers on
 .mode column
-SELECT u.email, u.name, w.usdtBalance, w.btcBalance
+SELECT u.email, u.name, w.usdtBalance, w.btcBalance, w.ethBalance, w.solBalance
 FROM User u
 JOIN Wallet w ON w.userId = u.id
 WHERE u.email = '$email_sql';

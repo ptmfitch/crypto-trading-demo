@@ -38,7 +38,7 @@ export async function registerUser(values: z.infer<typeof RegisterSchema>) {
       });
     });
 
-    return { success: "User created successfully! Please log in." };
+    return { success: true };
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2002") {

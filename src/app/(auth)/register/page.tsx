@@ -2,7 +2,7 @@
 
 import { registerUser } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -52,10 +52,12 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-zinc-950">
+    <main className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-zinc-950">
       <Card className="w-[400px]">
         <CardHeader>
-          <CardTitle>Create an Account</CardTitle>
+          <h1 data-slot="card-title" className="leading-none font-semibold">
+            Create an Account
+          </h1>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -123,6 +125,6 @@ export default function RegisterPage() {
           </p>
         </CardContent>
       </Card>
-    </div>
+    </main>
   );
 }

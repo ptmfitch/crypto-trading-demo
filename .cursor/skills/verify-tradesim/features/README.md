@@ -15,7 +15,7 @@ This directory is the maintained source for verifying the user-facing behavior o
 - Start every recipe from the baseline state unless its preconditions say otherwise.
 - Prefer ARIA roles and accessible names over CSS selectors or DOM position.
 - Drive the browser with `node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173`.
-- Start Chrome with `drive.mjs start` after doctor passes, and stop it with `drive.mjs stop` before server cleanup.
+- Start Chrome with `drive.mjs start` after doctor passes, and stop it with `drive.mjs stop` before server cleanup. Run `start` with the sandbox disabled. A seatbelt launch aborts Chrome and macOS shows "Google Chrome quit unexpectedly".
 - Confirm mutations with `tradesim-verify.sh wallet <email> --port <port>`.
 - Do not remove proof artifacts during cleanup.
 

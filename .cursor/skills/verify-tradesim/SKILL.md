@@ -43,6 +43,8 @@ Do not drive an instance that fails doctor. Do not attach Playwright to `http://
 
 Drive the browser with `.cursor/skills/verify-tradesim/scripts/drive.mjs`. It launches headless system Chrome against the verification origin. Start it after doctor passes, and stop it before cleanup.
 
+Run `drive.mjs start` with the sandbox disabled (Shell `required_permissions: ["all"]`, so `CURSOR_SANDBOX` is unset). A seatbelt launch aborts in macOS app registration and shows "Google Chrome quit unexpectedly". `start` exits before launching Chrome when `CURSOR_SANDBOX` is set. Later `drive.mjs` commands talk to the DevTools port and can run sandboxed.
+
 ```bash
 node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 start
 node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 goto /

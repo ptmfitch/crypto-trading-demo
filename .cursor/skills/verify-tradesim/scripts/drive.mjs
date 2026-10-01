@@ -5,6 +5,16 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
+function assertChromeCanLaunch() {
+  // Seatbelt denies the WindowServer mach lookup. Chrome then aborts in
+  // _RegisterApplication and macOS shows "Google Chrome quit unexpectedly".
+  if (process.env.CURSOR_SANDBOX) {
+    throw new Error(
+      "Refusing to launch Chrome while CURSOR_SANDBOX is set. The seatbelt sandbox blocks WindowServer registration, so Google Chrome aborts on startup and macOS shows \"Google Chrome quit unexpectedly\". Rerun drive.mjs start with the sandbox disabled."
+    );
+  }
+}
+
 function chromeBinary() {
   const candidates = [
     process.env.CHROME,
@@ -228,6 +238,7 @@ async function connect(port) {
 }
 
 async function start(port) {
+  assertChromeCanLaunch();
   const cdpPort = String(10000 + Number(port));
   const userDataDir = `${STATE_DIR}/chrome-${port}`;
   await mkdir(userDataDir, { recursive: true });

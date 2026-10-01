@@ -10,6 +10,7 @@ import {
   quoteDelayLabel,
   type BtcQuoteStatus,
 } from "@/lib/btc-quote";
+import { percentPayAmount } from "@/lib/trade-percent";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState, useTransition } from "react";
@@ -66,18 +67,11 @@ export function TradeForm({
         : amount * btcPrice
       : 0;
 
-  // Function to handle quick percentage clicks
-  const handlePercentageClick = (percentage: number) => {
-    if (tradeType === "SELL" && percentage === 1) {
-      // For 100% sell, use the exact btcBalance
-      form.setValue("amount", parseFloat(btcBalance.toFixed(8)));
-    } else {
-      const value = spendBalance * percentage;
-      form.setValue(
-        "amount",
-        parseFloat(value.toFixed(spendAsset === "USDT" ? 2 : 8))
-      );
-    }
+  const handlePercentageClick = (percent: number) => {
+    form.setValue(
+      "amount",
+      percentPayAmount(spendBalance, percent, spendAsset),
+    );
   };
 
   // Refetch price periodically. A failed refresh keeps the last quote and
@@ -201,7 +195,7 @@ export function TradeForm({
                     type="button"
                     size="sm"
                     variant="ghost"
-                    onClick={() => handlePercentageClick(p / 1000)}
+                    onClick={() => handlePercentageClick(p)}
                   >
                     {p}%
                   </Button>

@@ -16,10 +16,44 @@ model User {
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
 
-    accounts Account[]
-    sessions Session[]
-    wallet   Wallet?
-    trades   Trade[]
+    accounts        Account[]
+    sessions        Session[]
+    wallet          Wallet?
+    trades          Trade[]
+    recurringPlans  RecurringPlan[]
+}
+
+enum RecurringAsset {
+    bitcoin
+    ethereum
+    solana
+}
+
+enum RecurringCadence {
+    DAILY
+    WEEKLY
+}
+
+enum RecurringStatus {
+    ACTIVE
+    PAUSED
+    CANCELED
+}
+
+model RecurringPlan {
+    id          String           @id @default(cuid())
+    userId      String
+    assetId     RecurringAsset
+    quoteAmount Decimal
+    cadence     RecurringCadence
+    status      RecurringStatus  @default(ACTIVE)
+    nextRunAt   DateTime
+    lastRunAt   DateTime?
+    createdAt   DateTime         @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId, status, nextRunAt])
 }
 
 model Wallet {

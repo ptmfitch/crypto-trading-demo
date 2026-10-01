@@ -1,3 +1,4 @@
+import { listActivePriceAlerts } from "@/actions/price-alert";
 import { auth } from "@/auth";
 import { StatCard } from "@/components/StatCard";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,7 @@ import { Trade } from "@prisma/client";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { PriceAlerts } from "./_components/PriceAlerts";
 import {
   PnlDataPoint,
   PortfolioPnlChart,
@@ -74,10 +76,13 @@ export default async function ProfilePage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  const trades = await prisma.trade.findMany({
-    where: { userId: session.user.id },
-    orderBy: { timestamp: "asc" },
-  });
+  const [trades, alerts] = await Promise.all([
+    prisma.trade.findMany({
+      where: { userId: session.user.id },
+      orderBy: { timestamp: "asc" },
+    }),
+    listActivePriceAlerts(),
+  ]);
 
   const pnlData = calculatePnlHistory(trades);
   const finalPnl = pnlData.length > 0 ? pnlData[pnlData.length - 1].pnl : 0;
@@ -97,6 +102,8 @@ export default async function ProfilePage() {
             A detailed look at your trading history and performance.
           </p>
         </div>
+
+        <PriceAlerts alerts={alerts} />
 
         <div className="grid gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2">

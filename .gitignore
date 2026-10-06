@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+.cursor/skills/verify-tradesim/artifacts/
 
 # next.js
 /.next/
@@ -32,6 +33,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+
+# Chainguard session token written by `chainctl auth configure-npm`
+.npmrc
 
 # vercel
 .vercel

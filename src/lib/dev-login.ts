@@ -1,3 +1,5 @@
+import type { Messages } from "@/i18n/en";
+import { t } from "@/i18n/translate";
 import prisma from "./prisma";
 
 export type TestAccount = {
@@ -28,11 +30,16 @@ function formatBtc(value: { toString(): string } | null | undefined) {
   }).format(amount);
 }
 
-function tradeLabel(count: number) {
-  return count === 1 ? "1 trade" : `${count} trades`;
+function formatTradeCount(count: number, messages: Messages) {
+  if (count === 1) {
+    return messages.auth.oneTrade;
+  }
+  return t(messages, "auth.tradesCount", { count });
 }
 
-export async function listTestAccounts(): Promise<TestAccount[]> {
+export async function listTestAccounts(
+  messages: Messages
+): Promise<TestAccount[]> {
   if (!isDevLoginEnabled()) {
     return [];
   }
@@ -50,7 +57,11 @@ export async function listTestAccounts(): Promise<TestAccount[]> {
 
   return users.map((user) => ({
     email: user.email,
-    name: user.name?.trim() || "Unnamed account",
-    summary: `${formatUsd(user.wallet?.usdtBalance)} cash · ${formatBtc(user.wallet?.btcBalance)} BTC · ${tradeLabel(user._count.trades)}`,
+    name: user.name?.trim() || messages.auth.unnamedAccount,
+    summary: t(messages, "auth.accountSummary", {
+      cash: formatUsd(user.wallet?.usdtBalance),
+      btc: formatBtc(user.wallet?.btcBalance),
+      n: formatTradeCount(user._count.trades, messages),
+    }),
   }));
 }

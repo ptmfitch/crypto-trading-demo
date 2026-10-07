@@ -4,24 +4,32 @@ import { executeTrade } from "@/actions/trade";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   quoteDelayLabel,
   type BtcQuoteStatus,
 } from "@/lib/btc-quote";
+import {
+  balanceFieldError,
+  tradeAmountSchema,
+  youReceiveAccessibleName,
+} from "@/lib/form-errors";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-
-const formSchema = z.object({
-  amount: z.coerce
-    .number()
-    .positive({ message: "Amount must be greater than 0" }),
-});
 
 interface TradeFormProps {
   initialBtcPrice: number | null;
@@ -46,9 +54,11 @@ export function TradeForm({
   );
   const [tradeType, setTradeType] = useState<"BUY" | "SELL">("BUY");
   const [isPending, startTransition] = useTransition();
+  const receiveFieldId = useId();
+  const amountRef = useRef<HTMLInputElement>(null);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<z.infer<typeof tradeAmountSchema>>({
+    resolver: zodResolver(tradeAmountSchema),
     defaultValues: { amount: 0 },
   });
   const amount = form.watch("amount");
@@ -68,16 +78,18 @@ export function TradeForm({
 
   // Function to handle quick percentage clicks
   const handlePercentageClick = (percentage: number) => {
-    if (tradeType === "SELL" && percentage === 1) {
-      // For 100% sell, use the exact btcBalance
-      form.setValue("amount", parseFloat(btcBalance.toFixed(8)));
-    } else {
-      const value = spendBalance * percentage;
-      form.setValue(
-        "amount",
-        parseFloat(value.toFixed(spendAsset === "USDT" ? 2 : 8))
-      );
+    const next =
+      tradeType === "SELL" && percentage === 1
+        ? // For 100% sell, use the exact btcBalance
+          parseFloat(btcBalance.toFixed(8))
+        : parseFloat(
+            (spendBalance * percentage).toFixed(spendAsset === "USDT" ? 2 : 8)
+          );
+    // The amount input is uncontrolled, so the DOM value has to be set too.
+    if (amountRef.current) {
+      amountRef.current.value = String(next);
     }
+    form.setValue("amount", next, { shouldValidate: true });
   };
 
   // Refetch price periodically. A failed refresh keeps the last quote and
@@ -124,7 +136,7 @@ export function TradeForm({
           maximumFractionDigits: 2,
         })}`;
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  function onSubmit(values: z.infer<typeof tradeAmountSchema>) {
     if (!quoteReady) {
       toast.error("Trading is paused until a live BTC quote returns.");
       return;
@@ -139,8 +151,19 @@ export function TradeForm({
       if (result.success) {
         toast.success(result.success);
         form.reset({ amount: 0 });
+        if (amountRef.current) {
+          amountRef.current.value = "0";
+        }
       } else {
         toast.error(result.error);
+        const fieldError = balanceFieldError(result.error);
+        if (fieldError) {
+          form.setError(
+            "amount",
+            { message: fieldError },
+            { shouldFocus: true }
+          );
+        }
       }
     });
   }
@@ -150,7 +173,10 @@ export function TradeForm({
       <CardHeader>
         <Tabs
           value={tradeType}
-          onValueChange={(value) => setTradeType(value as "BUY" | "SELL")}
+          onValueChange={(value) => {
+            setTradeType(value as "BUY" | "SELL");
+            form.clearErrors("amount");
+          }}
           className="w-full"
         >
           <TabsList className="grid w-full grid-cols-2">
@@ -173,53 +199,83 @@ export function TradeForm({
             <Badge variant="outline">{delayLabel}</Badge>
           ) : null}
         </div>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           {/* --- SPEND INPUT --- */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">You Pay</label>
-            <div className="relative">
-              <Input
-                type="number"
-                step="any"
-                className="pr-16 text-lg"
-                {...form.register("amount")}
-                placeholder="0.00"
-              />
-              <span className="absolute inset-y-0 right-4 flex items-center text-muted-foreground font-semibold">
-                {spendAsset}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground">
-                Available: {spendBalance.toFixed(spendAsset === "USDT" ? 2 : 6)}{" "}
-                {spendAsset}
-              </span>
-              <div className="space-x-1">
-                {[25, 50, 100].map((p) => (
-                  <Button
-                    key={p}
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handlePercentageClick(p / 1000)}
-                  >
-                    {p}%
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </div>
+          <FormField
+            control={form.control}
+            name="amount"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>You Pay</FormLabel>
+                <div className="relative">
+                  <FormControl>
+                    {/* Uncontrolled so a trailing "." stays put. Binding value
+                        rewrites the number input on the validation re-render
+                        and the in-progress decimal disappears. */}
+                    <Input
+                      type="number"
+                      step="any"
+                      className="pr-16 text-lg"
+                      placeholder="0.00"
+                      name={field.name}
+                      defaultValue={0}
+                      onBlur={field.onBlur}
+                      onChange={field.onChange}
+                      ref={(node) => {
+                        amountRef.current = node;
+                        field.ref(node);
+                      }}
+                    />
+                  </FormControl>
+                  <span className="absolute inset-y-0 right-4 flex items-center text-muted-foreground font-semibold">
+                    {spendAsset}
+                  </span>
+                </div>
+                <FormMessage />
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-muted-foreground">
+                    Available: {spendBalance.toFixed(spendAsset === "USDT" ? 2 : 6)}{" "}
+                    {spendAsset}
+                  </span>
+                  <div className="space-x-1">
+                    {[25, 50, 100].map((p) => (
+                      <Button
+                        key={p}
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handlePercentageClick(p / 1000)}
+                      >
+                        {p}%
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </FormItem>
+            )}
+          />
 
           {/* --- RECEIVE DISPLAY --- */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">You Receive</label>
+            <Label htmlFor={receiveFieldId}>
+              {/* Visible text stays "You Receive". The name includes the asset once. */}
+              <span aria-hidden="true">You Receive</span>
+              <span className="sr-only">
+                {youReceiveAccessibleName(receiveAsset)}
+              </span>
+            </Label>
             <div className="relative">
               <Input
+                id={receiveFieldId}
                 readOnly
                 className="pr-16 text-lg bg-muted/50"
                 value={receiveAmount.toFixed(2)}
               />
-              <span className="absolute inset-y-0 right-4 flex items-center text-muted-foreground font-semibold">
+              <span
+                aria-hidden="true"
+                className="absolute inset-y-0 right-4 flex items-center text-muted-foreground font-semibold"
+              >
                 {receiveAsset}
               </span>
             </div>
@@ -237,7 +293,8 @@ export function TradeForm({
               Buying and selling stay paused until a live quote returns.
             </p>
           ) : null}
-        </form>
+          </form>
+        </Form>
       </CardContent>
     </Card>
   );

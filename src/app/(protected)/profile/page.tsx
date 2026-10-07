@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { parseLocale, type Locale } from "@/i18n/config";
+import { localeToDateLocale, parseLocale } from "@/i18n/config";
 import { getDictionary } from "@/i18n/get-dictionary";
 import prisma from "@/lib/prisma";
 import {
@@ -29,15 +29,11 @@ import {
 
 const INITIAL_CAPITAL = 10000;
 
-function dateLocaleTag(locale: Locale): string {
-  return locale === "sv" ? "sv-SE" : "en-US";
-}
-
 function tradeTypeLabel(
   type: string,
   messages: Awaited<ReturnType<typeof getDictionary>>["messages"]
 ) {
-  return type === "BUY" ? messages.profile.buy : messages.profile.sell;
+  return type === "BUY" ? messages.profile.buyLabel : messages.profile.sellLabel;
 }
 
 function calculatePnlHistory(trades: Trade[]): PnlDataPoint[] {
@@ -89,7 +85,7 @@ export default async function ProfilePage() {
   if (!session?.user?.id) redirect("/login");
 
   const { locale, messages } = await getDictionary();
-  const dateLocale = dateLocaleTag(locale);
+  const dateLocale = localeToDateLocale(locale);
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
@@ -119,7 +115,7 @@ export default async function ProfilePage() {
             {messages.profile.performanceReport}
           </h1>
           <p className="text-muted-foreground">
-            {messages.profile.performanceReportDescription}
+            {messages.profile.performanceDescription}
           </p>
         </div>
 
@@ -134,7 +130,7 @@ export default async function ProfilePage() {
                 </CardHeader>
                 <CardContent className="flex items-center justify-center h-[250px]">
                   <p className="text-muted-foreground">
-                    {messages.profile.makeAtLeastTwoTrades}
+                    {messages.profile.chartMinTrades}
                   </p>
                 </CardContent>
               </Card>
@@ -212,13 +208,13 @@ export default async function ProfilePage() {
                           {messages.profile.noTradesYet}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {messages.profile.emptyTradeHistoryDescription}
+                          {messages.profile.emptyHistoryDescription}
                         </p>
                         <Link
                           href="/dashboard"
                           className="text-sm font-medium text-primary hover:underline"
                         >
-                          {messages.profile.placeYourFirstTrade}
+                          {messages.profile.placeFirstTrade}
                         </Link>
                       </div>
                     </TableCell>

@@ -19,7 +19,7 @@ type LanguageSelectProps = {
 };
 
 export function LanguageSelect({ value }: LanguageSelectProps) {
-  const messages = useMessages();
+  const { messages } = useMessages();
   const router = useRouter();
 
   async function onValueChange(nextLocale: string) {

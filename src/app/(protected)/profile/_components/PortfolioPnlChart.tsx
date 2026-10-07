@@ -13,7 +13,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { type Locale } from "@/i18n/config";
+import { localeToDateLocale, type Locale } from "@/i18n/config";
 import { useMessages } from "@/i18n/locale-provider";
 import {
   Area,
@@ -29,18 +29,14 @@ export type PnlDataPoint = {
   pnl: number;
 };
 
-function dateLocaleTag(locale: Locale): string {
-  return locale === "sv" ? "sv-SE" : "en-US";
-}
-
 type PortfolioPnlChartProps = {
   data: PnlDataPoint[];
   locale: Locale;
 };
 
 export function PortfolioPnlChart({ data, locale }: PortfolioPnlChartProps) {
-  const messages = useMessages();
-  const dateLocale = dateLocaleTag(locale);
+  const { messages } = useMessages();
+  const dateLocale = localeToDateLocale(locale);
 
   const chartConfig = {
     pnl: {
@@ -60,7 +56,7 @@ export function PortfolioPnlChart({ data, locale }: PortfolioPnlChartProps) {
       <CardHeader>
         <CardTitle>{messages.profile.portfolioPerformance}</CardTitle>
         <CardDescription>
-          {messages.profile.portfolioPerformanceDescription}
+          {messages.profile.portfolioPnlDescription}
         </CardDescription>
       </CardHeader>
       <CardContent>

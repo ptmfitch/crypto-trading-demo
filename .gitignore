@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# generated TradeSim browser proof
+.cursor/skills/verify-tradesim/artifacts/

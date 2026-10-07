@@ -1,6 +1,6 @@
 ---
 name: verify-tradesim
-description: Drive the TradeSim crypto trading demo in a browser and prove registration, login, BTC buys, and the profile report. Use when changing this app's UI, auth, wallet, or trades.
+description: Drive the TradeSim crypto trading demo in a browser and prove registration, login, BTC buys, the profile report, and dashboard chart date filters. Use when changing this app's UI, auth, wallet, trades, or the BTC price chart.
 ---
 
 # Verify TradeSim
@@ -64,6 +64,7 @@ Stable handles:
 - Register card text: `Create an Account`. Textboxes: `Name`, `Email`, `Password`. Submit button: `Create Account`. Alternate link: `Login`.
 - Login card text: `Welcome Back`. Textboxes: `Email`, `Password`. Submit button: `Login`. When `DEV_LOGIN=true`, combobox accessible name `Test account`, button `Continue as this account`.
 - Dashboard heading: `Welcome Back, <name>!`. Stat titles: `Portfolio Value`, `Total P&L`, `Live BTC Price`, `Total Trades`. Trade tabs: `Buy`, `Sell`. The trade card shows the BTC quote. Amount field: the number input under the visible label `You Pay` (placeholder `0.00`; the label is not wired to the input). Submit button: `BUY BTC` or `SELL BTC`. When the quote is delayed or missing, the card shows a `Price delayed` or `Price unavailable` chip, the quote text is muted, and the submit button is disabled. The pay field and percent buttons stay usable. A disabled control's accessibility snapshot ends with `disabled`.
+- BTC chart card title: `Bitcoin Price`. Preset combobox accessible name: `Select a value`. Default description starts with `Showing last 30 days`. Date filters are textboxes `From` and `To`. After either date is set, button `Clear dates` is shown. A one-sided choice shows `Choose both dates to filter the chart.` A valid pair replaces the description prefix with `Filtered to <Mon D, YYYY> – <Mon D, YYYY>`. An inverted pair shows `The start date must be on or before the end date.` Choosing a preset clears the dates.
 - Header links on protected pages: `TradeSim`, `Dashboard`, `Profile`, button `Logout`.
 - Profile heading: `Performance Report`. Section heading: `Trade History`.
 

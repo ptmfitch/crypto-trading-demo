@@ -10,6 +10,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { parseLocale, type Locale } from "@/i18n/config";
+import { getDictionary } from "@/i18n/get-dictionary";
 import prisma from "@/lib/prisma";
 import {
   formatTradeHistoryBtc,
@@ -19,12 +21,24 @@ import { Trade } from "@prisma/client";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { LanguageSelect } from "./_components/LanguageSelect";
 import {
   PnlDataPoint,
   PortfolioPnlChart,
 } from "./_components/PortfolioPnlChart";
 
 const INITIAL_CAPITAL = 10000;
+
+function dateLocaleTag(locale: Locale): string {
+  return locale === "sv" ? "sv-SE" : "en-US";
+}
+
+function tradeTypeLabel(
+  type: string,
+  messages: Awaited<ReturnType<typeof getDictionary>>["messages"]
+) {
+  return type === "BUY" ? messages.profile.buy : messages.profile.sell;
+}
 
 function calculatePnlHistory(trades: Trade[]): PnlDataPoint[] {
   if (!trades || trades.length === 0) {
@@ -74,6 +88,15 @@ export default async function ProfilePage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
+  const { locale, messages } = await getDictionary();
+  const dateLocale = dateLocaleTag(locale);
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { locale: true },
+  });
+  const userLocale = parseLocale(user?.locale);
+
   const trades = await prisma.trade.findMany({
     where: { userId: session.user.id },
     orderBy: { timestamp: "asc" },
@@ -92,61 +115,68 @@ export default async function ProfilePage() {
     <main className="flex-1 bg-muted/40">
       <div className="container mx-auto py-8">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold">Performance Report</h1>
+          <h1 className="text-3xl font-bold">
+            {messages.profile.performanceReport}
+          </h1>
           <p className="text-muted-foreground">
-            A detailed look at your trading history and performance.
+            {messages.profile.performanceReportDescription}
           </p>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2">
             {hasSufficientDataForChart ? (
-              <PortfolioPnlChart data={pnlData} />
+              <PortfolioPnlChart data={pnlData} locale={locale} />
             ) : (
               <Card>
                 <CardHeader>
-                  <CardTitle>Performance Chart</CardTitle>
+                  <CardTitle>{messages.profile.performanceChart}</CardTitle>
                 </CardHeader>
                 <CardContent className="flex items-center justify-center h-[250px]">
                   <p className="text-muted-foreground">
-                    Make at least two trades to see your performance chart.
+                    {messages.profile.makeAtLeastTwoTrades}
                   </p>
                 </CardContent>
               </Card>
             )}
           </div>
           <div className="lg:col-span-1 space-y-6">
+            <LanguageSelect value={userLocale} />
             <StatCard
-              title="Lifetime P&L"
+              title={messages.profile.lifetimePnl}
               value={`$${finalPnl.toLocaleString()}`}
               icon={finalPnl >= 0 ? TrendingUp : TrendingDown}
               color={pnlColor}
             />
             <Card>
               <CardHeader>
-                <CardTitle>Key Metrics</CardTitle>
+                <CardTitle>{messages.profile.keyMetrics}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Win Rate</span>{" "}
+                  <span className="text-muted-foreground">
+                    {messages.profile.winRate}
+                  </span>
                   <span className="font-semibold">{winRate.toFixed(1)}%</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Total Trades</span>{" "}
+                  <span className="text-muted-foreground">
+                    {messages.profile.totalTrades}
+                  </span>
                   <span className="font-semibold">{trades.length}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground text-green-500">
-                    Best Trade
-                  </span>{" "}
+                    {messages.profile.bestTrade}
+                  </span>
                   <span className="font-semibold text-green-500">
                     +${bestTradePnl.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground text-red-500">
-                    Worst Trade
-                  </span>{" "}
+                    {messages.profile.worstTrade}
+                  </span>
                   <span className="font-semibold text-red-500">
                     -${Math.abs(worstTradePnl).toFixed(2)}
                   </span>
@@ -157,16 +187,20 @@ export default async function ProfilePage() {
         </div>
 
         <div className="mt-8">
-          <h2 className="text-2xl font-bold mb-4">Trade History</h2>
+          <h2 className="text-2xl font-bold mb-4">
+            {messages.profile.tradeHistory}
+          </h2>
           <div className="border rounded-lg">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Price (USD)</TableHead>
-                  <TableHead>Amount (BTC)</TableHead>
-                  <TableHead className="text-right">Total (USD)</TableHead>
+                  <TableHead>{messages.profile.date}</TableHead>
+                  <TableHead>{messages.profile.type}</TableHead>
+                  <TableHead>{messages.profile.priceUsd}</TableHead>
+                  <TableHead>{messages.profile.amountBtc}</TableHead>
+                  <TableHead className="text-right">
+                    {messages.profile.totalUsd}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -174,16 +208,17 @@ export default async function ProfilePage() {
                   <TableRow>
                     <TableCell colSpan={5} className="h-32">
                       <div className="flex flex-col items-center justify-center gap-2 text-center">
-                        <p className="font-medium">No trades yet</p>
+                        <p className="font-medium">
+                          {messages.profile.noTradesYet}
+                        </p>
                         <p className="text-sm text-muted-foreground">
-                          Your buy and sell history will appear here after your
-                          first order.
+                          {messages.profile.emptyTradeHistoryDescription}
                         </p>
                         <Link
                           href="/dashboard"
                           className="text-sm font-medium text-primary hover:underline"
                         >
-                          Place your first trade
+                          {messages.profile.placeYourFirstTrade}
                         </Link>
                       </div>
                     </TableCell>
@@ -191,14 +226,16 @@ export default async function ProfilePage() {
                 ) : (
                   [...trades].reverse().map((trade) => (
                     <TableRow key={trade.id}>
-                      <TableCell>{trade.timestamp.toLocaleString()}</TableCell>
+                      <TableCell>
+                        {trade.timestamp.toLocaleString(dateLocale)}
+                      </TableCell>
                       <TableCell>
                         <Badge
                           variant={
                             trade.type === "BUY" ? "default" : "destructive"
                           }
                         >
-                          {trade.type}
+                          {tradeTypeLabel(trade.type, messages)}
                         </Badge>
                       </TableCell>
                       <TableCell>

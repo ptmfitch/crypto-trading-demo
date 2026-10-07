@@ -13,6 +13,8 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { type Locale } from "@/i18n/config";
+import { useMessages } from "@/i18n/locale-provider";
 import {
   Area,
   AreaChart,
@@ -27,16 +29,27 @@ export type PnlDataPoint = {
   pnl: number;
 };
 
-const chartConfig = {
-  pnl: {
-    label: "P&L",
-    color: "hsl(var(--chart-1))",
-  },
-} satisfies ChartConfig;
+function dateLocaleTag(locale: Locale): string {
+  return locale === "sv" ? "sv-SE" : "en-US";
+}
 
-export function PortfolioPnlChart({ data }: { data: PnlDataPoint[] }) {
+type PortfolioPnlChartProps = {
+  data: PnlDataPoint[];
+  locale: Locale;
+};
+
+export function PortfolioPnlChart({ data, locale }: PortfolioPnlChartProps) {
+  const messages = useMessages();
+  const dateLocale = dateLocaleTag(locale);
+
+  const chartConfig = {
+    pnl: {
+      label: messages.profile.pnl,
+      color: "hsl(var(--chart-1))",
+    },
+  } satisfies ChartConfig;
+
   const isLoss = data.length > 0 && data[data.length - 1].pnl < 0;
-  // Conditionally set the colors based on performance
   const strokeColor = isLoss
     ? "hsl(var(--destructive))"
     : "hsl(var(--chart-2))";
@@ -45,9 +58,9 @@ export function PortfolioPnlChart({ data }: { data: PnlDataPoint[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Portfolio Performance</CardTitle>
+        <CardTitle>{messages.profile.portfolioPerformance}</CardTitle>
         <CardDescription>
-          Your portfolio&apos;s profit and loss over time.
+          {messages.profile.portfolioPerformanceDescription}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -95,7 +108,7 @@ export function PortfolioPnlChart({ data }: { data: PnlDataPoint[] }) {
               tick={{ fill: `hsl(var(--muted-foreground))` }}
               tickFormatter={(value) => {
                 const date = new Date(value);
-                return date.toLocaleDateString("en-US", {
+                return date.toLocaleDateString(dateLocale, {
                   month: "short",
                   day: "numeric",
                 });
@@ -113,16 +126,15 @@ export function PortfolioPnlChart({ data }: { data: PnlDataPoint[] }) {
               content={
                 <ChartTooltipContent
                   labelFormatter={(label) =>
-                    new Date(label).toLocaleDateString()
+                    new Date(label).toLocaleDateString(dateLocale)
                   }
                   formatter={(value) => [
                     `$${Number(value).toLocaleString()}`,
-                    "P&L",
+                    messages.profile.pnl,
                   ]}
                 />
               }
             />
-            {/* A line at y=0 to show break-even point */}
             <ReferenceLine
               y={0}
               stroke="hsl(var(--muted-foreground))"

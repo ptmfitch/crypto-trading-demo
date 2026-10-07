@@ -3,27 +3,39 @@ import os from "node:os";
 import path from "node:path";
 
 import {
+  chartPointsFromRows,
+  chartRangeUnix,
+  filterChartPoints,
+  type ChartPoint,
+} from "@/lib/btc-chart-range";
+import {
   type CachedQuote,
   type ResolvedQuote,
   resolveBtcQuote,
   type UpstreamQuote,
 } from "@/lib/btc-quote";
 
+export type { ChartPoint };
+
 const PRICE_URL =
   "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true";
 const CHART_URL =
   "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=";
+const CHART_RANGE_URL =
+  "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range?vs_currency=usd&from=";
 const CHART_FRESH_TTL_MS = 900_000;
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
 export const CHART_DAYS = ["7", "30", "90", "365"] as const;
 export type ChartDays = (typeof CHART_DAYS)[number];
 
-export type ChartPoint = { date: string; price: number };
+type ChartCacheEntry = { fetchedAt: number; points: ChartPoint[] };
 
-type ChartCacheFile = Partial<
-  Record<ChartDays, { fetchedAt: number; points: ChartPoint[] }>
->;
+type ChartCacheFile = Partial<Record<ChartDays, ChartCacheEntry>> & {
+  ranges?: Record<string, ChartCacheEntry>;
+};
+
+const MAX_RANGE_CACHE = 8;
 
 export type BtcQuote = Omit<ResolvedQuote, "nextCache">;
 
@@ -163,8 +175,8 @@ function readChartEntry(days: ChartDays) {
   return { fetchedAt: entry.fetchedAt, points };
 }
 
-async function fetchCoinGeckoChart(days: ChartDays): Promise<ChartPoint[]> {
-  const response = await fetch(`${CHART_URL}${days}`, {
+async function fetchCoinGeckoPrices(url: string): Promise<ChartPoint[]> {
+  const response = await fetch(url, {
     cache: "no-store",
     signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
@@ -172,18 +184,24 @@ async function fetchCoinGeckoChart(days: ChartDays): Promise<ChartPoint[]> {
     throw new Error(`CoinGecko chart responded ${response.status}`);
   }
   const data = (await response.json()) as { prices?: unknown };
-  if (!Array.isArray(data.prices)) {
-    throw new Error("CoinGecko chart payload missing prices");
-  }
-  const points: ChartPoint[] = [];
-  for (const row of data.prices) {
-    if (!Array.isArray(row) || row.length < 2) continue;
-    const [timestamp, price] = row;
-    if (typeof timestamp !== "number" || typeof price !== "number") continue;
-    points.push({ date: new Date(timestamp).toISOString(), price });
-  }
+  const points = chartPointsFromRows(data.prices);
   if (points.length === 0) throw new Error("CoinGecko chart payload was empty");
   return points;
+}
+
+async function fetchCoinGeckoChart(days: ChartDays): Promise<ChartPoint[]> {
+  return fetchCoinGeckoPrices(`${CHART_URL}${days}`);
+}
+
+async function fetchCoinGeckoChartRange(
+  from: string,
+  to: string
+): Promise<ChartPoint[]> {
+  const { fromUnix, toUnix } = chartRangeUnix(from, to);
+  const points = await fetchCoinGeckoPrices(
+    `${CHART_RANGE_URL}${fromUnix}&to=${toUnix}`
+  );
+  return filterChartPoints(points, from, to);
 }
 
 export async function getBtcChart(days: ChartDays): Promise<BtcChart> {
@@ -210,6 +228,68 @@ export async function getBtcChart(days: ChartDays): Promise<BtcChart> {
     console.error("[BTC Chart] upstream failed", error);
     return cached
       ? { status: "stale", points: cached.points }
+      : { status: "unavailable", points: [] };
+  }
+}
+
+function readRangeEntry(from: string, to: string) {
+  const parsed = readJson(chartCachePath());
+  if (!parsed || typeof parsed !== "object") return null;
+  const entry = (parsed as ChartCacheFile).ranges?.[`${from}:${to}`];
+  if (!entry || !Array.isArray(entry.points) || entry.points.length === 0) {
+    return null;
+  }
+  if (!Number.isFinite(entry.fetchedAt)) return null;
+  const points = entry.points.filter(
+    (point) =>
+      point &&
+      typeof point.date === "string" &&
+      typeof point.price === "number" &&
+      Number.isFinite(point.price)
+  );
+  if (points.length === 0) return null;
+  return { fetchedAt: entry.fetchedAt, points };
+}
+
+function writeRangeEntry(from: string, to: string, points: ChartPoint[]) {
+  const parsed = readJson(chartCachePath());
+  const file: ChartCacheFile =
+    parsed && typeof parsed === "object" ? (parsed as ChartCacheFile) : {};
+  const ranges = { ...(file.ranges ?? {}) };
+  ranges[`${from}:${to}`] = { fetchedAt: Date.now(), points };
+  const newest = Object.entries(ranges)
+    .sort((a, b) => a[1].fetchedAt - b[1].fetchedAt)
+    .slice(-MAX_RANGE_CACHE);
+  file.ranges = Object.fromEntries(newest);
+  writeJson(chartCachePath(), file);
+}
+
+export async function getBtcChartRange(
+  from: string,
+  to: string
+): Promise<BtcChart> {
+  const cached = readRangeEntry(from, to);
+  const age = cached ? Date.now() - cached.fetchedAt : Number.POSITIVE_INFINITY;
+  if (!upstreamBlocked() && cached && age >= 0 && age < CHART_FRESH_TTL_MS) {
+    return {
+      status: "fresh",
+      points: filterChartPoints(cached.points, from, to),
+    };
+  }
+  if (upstreamBlocked()) {
+    return cached
+      ? { status: "stale", points: filterChartPoints(cached.points, from, to) }
+      : { status: "unavailable", points: [] };
+  }
+
+  try {
+    const points = await fetchCoinGeckoChartRange(from, to);
+    if (points.length > 0) writeRangeEntry(from, to, points);
+    return { status: "fresh", points };
+  } catch (error) {
+    console.error("[BTC Chart] upstream failed", error);
+    return cached
+      ? { status: "stale", points: filterChartPoints(cached.points, from, to) }
       : { status: "unavailable", points: [] };
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -13,6 +14,8 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -21,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { chartFilterLabel, parseChartRange } from "@/lib/btc-chart-range";
 import {
   quoteDelayLabel,
   type BtcQuoteStatus,
@@ -44,6 +48,17 @@ const timeRangeOptions = [
   { label: "Last Year", value: "365" },
 ];
 
+function utcToday() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function localToday() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
 function chartStatus(value: unknown): BtcQuoteStatus | null {
   if (value === "fresh" || value === "stale" || value === "unavailable") {
     return value;
@@ -57,18 +72,44 @@ export function BtcPriceChart() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [quoteStatus, setQuoteStatus] = React.useState<BtcQuoteStatus>("fresh");
   const [timeRange, setTimeRange] = React.useState("30");
+  const [fromDate, setFromDate] = React.useState("");
+  const [toDate, setToDate] = React.useState("");
+  const [rangeError, setRangeError] = React.useState<string | null>(null);
+  const [filterLabel, setFilterLabel] = React.useState<string | null>(null);
   const dataRef = React.useRef(data);
   const loadedRangeRef = React.useRef(loadedRange);
   dataRef.current = data;
   loadedRangeRef.current = loadedRange;
 
+  const rangeHint =
+    (fromDate !== "" || toDate !== "") && (fromDate === "" || toDate === "")
+      ? "Choose both dates to filter the chart."
+      : null;
+
   React.useEffect(() => {
     let cancelled = false;
+    let requestUrl = `/api/btc-chart?days=${timeRange}`;
+    let requestKey = `days:${timeRange}`;
+
+    if (fromDate !== "" && toDate !== "") {
+      const parsed = parseChartRange(fromDate, toDate, utcToday());
+      if (!parsed.ok) {
+        setRangeError(parsed.error);
+        setIsLoading(false);
+        return;
+      }
+      setRangeError(null);
+      requestKey = `range:${parsed.from}:${parsed.to}`;
+      requestUrl = `/api/btc-chart?from=${parsed.from}&to=${parsed.to}`;
+    } else {
+      setRangeError(null);
+    }
+
     const fetchData = async () => {
-      const hasThisRange = loadedRangeRef.current === timeRange;
+      const hasThisRange = loadedRangeRef.current === requestKey;
       if (!hasThisRange) setIsLoading(true);
       try {
-        const response = await fetch(`/api/btc-chart?days=${timeRange}`, {
+        const response = await fetch(requestUrl, {
           cache: "no-store",
         });
         const payload = await response.json();
@@ -79,19 +120,28 @@ export function BtcPriceChart() {
             ? payload.points
             : null;
         const status = chartStatus(payload?.status);
-        if (!response.ok || !points || points.length === 0) {
+        if (!response.ok || !points) {
+          if (typeof payload?.error === "string") setRangeError(payload.error);
           if (hasThisRange && dataRef.current.length > 0) {
             setQuoteStatus("stale");
           } else {
             setData([]);
             setLoadedRange(null);
+            setFilterLabel(null);
             setQuoteStatus(status === "stale" ? "stale" : "unavailable");
           }
           return;
         }
         setData(points);
-        setLoadedRange(timeRange);
+        setLoadedRange(requestKey);
         setQuoteStatus(status ?? "fresh");
+        setFilterLabel(
+          requestKey.startsWith("range:") &&
+            typeof payload.from === "string" &&
+            typeof payload.to === "string"
+            ? chartFilterLabel(payload.from, payload.to)
+            : null
+        );
       } catch (error) {
         if (cancelled) return;
         console.error("Failed to fetch chart data", error);
@@ -100,6 +150,7 @@ export function BtcPriceChart() {
         } else {
           setData([]);
           setLoadedRange(null);
+          setFilterLabel(null);
           setQuoteStatus("unavailable");
         }
       } finally {
@@ -110,7 +161,7 @@ export function BtcPriceChart() {
     return () => {
       cancelled = true;
     };
-  }, [timeRange]);
+  }, [timeRange, fromDate, toDate]);
 
   const { chartDomain, isPositiveChange, currentPrice, priceChange } =
     React.useMemo(() => {
@@ -145,8 +196,36 @@ export function BtcPriceChart() {
     ? "hsl(var(--chart-positive))"
     : "hsl(var(--chart-negative))";
   const fillColorId = isPositiveChange ? "fillPositive" : "fillNegative";
-  const showSkeleton = isLoading && loadedRange !== timeRange;
+  const parsedRange =
+    fromDate !== "" && toDate !== ""
+      ? parseChartRange(fromDate, toDate, utcToday())
+      : null;
+  const requestKey = parsedRange?.ok
+    ? `range:${parsedRange.from}:${parsedRange.to}`
+    : `days:${timeRange}`;
+  const showSkeleton = isLoading && loadedRange !== requestKey;
   const delayLabel = quoteDelayLabel(quoteStatus);
+  const presetLabel = timeRangeOptions.find((option) => option.value === timeRange);
+  const changeSentence =
+    data.length === 0
+      ? isLoading
+        ? "Loading chart"
+        : loadedRange?.startsWith("range:")
+          ? "No prices in this date range"
+          : "Chart unavailable"
+      : `${isPositiveChange ? "Increased" : "Decreased"} by $${priceChange.value.toFixed(2)} (${priceChange.percent.toFixed(2)}%)`;
+  const windowSentence = filterLabel
+    ? `${filterLabel} · ${changeSentence}`
+    : presetLabel
+      ? `Showing ${presetLabel.label.toLowerCase()} · ${changeSentence}`
+      : changeSentence;
+  const today = localToday();
+
+  function clearDates() {
+    setFromDate("");
+    setToDate("");
+    setRangeError(null);
+  }
 
   return (
     <Card>
@@ -157,33 +236,89 @@ export function BtcPriceChart() {
             {delayLabel ? <Badge variant="outline">{delayLabel}</Badge> : null}
           </CardTitle>
           <CardDescription>
-            {data.length === 0
-              ? "Chart unavailable"
-              : `${isPositiveChange ? "Increased" : "Decreased"} by $${priceChange.value.toFixed(2)} (${priceChange.percent.toFixed(2)}%)`}
+            {rangeError ?? windowSentence}
           </CardDescription>
         </div>
-        <Select value={timeRange} onValueChange={setTimeRange}>
-          <SelectTrigger
-            className="w-[160px] rounded-lg sm:ml-auto"
-            aria-label="Select a value"
-          >
-            <SelectValue placeholder="Select time range" />
-          </SelectTrigger>
-          <SelectContent className="rounded-xl">
-            {timeRangeOptions.map(({ label, value }) => (
-              <SelectItem key={value} value={value} className="rounded-lg">
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-col gap-2 sm:ml-auto">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="grid gap-1">
+              <Label htmlFor="btc-chart-from" className="text-xs text-muted-foreground">
+                From
+              </Label>
+              <Input
+                id="btc-chart-from"
+                type="date"
+                aria-label="From"
+                value={fromDate}
+                max={toDate || today}
+                aria-invalid={rangeError ? true : undefined}
+                onChange={(event) => setFromDate(event.target.value)}
+                className="w-[11.5rem]"
+              />
+            </div>
+            <div className="grid gap-1">
+              <Label htmlFor="btc-chart-to" className="text-xs text-muted-foreground">
+                To
+              </Label>
+              <Input
+                id="btc-chart-to"
+                type="date"
+                aria-label="To"
+                value={toDate}
+                min={fromDate || undefined}
+                max={today}
+                aria-invalid={rangeError ? true : undefined}
+                onChange={(event) => setToDate(event.target.value)}
+                className="w-[11.5rem]"
+              />
+            </div>
+            {fromDate || toDate ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={clearDates}
+              >
+                Clear dates
+              </Button>
+            ) : null}
+            <Select
+              value={timeRange}
+              onValueChange={(value) => {
+                setTimeRange(value);
+                setFromDate("");
+                setToDate("");
+                setRangeError(null);
+              }}
+            >
+              <SelectTrigger
+                className="w-[160px] rounded-lg"
+                aria-label="Select a value"
+              >
+                <SelectValue placeholder="Select time range" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                {timeRangeOptions.map(({ label, value }) => (
+                  <SelectItem key={value} value={value} className="rounded-lg">
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {rangeHint ? (
+            <p className="text-xs text-muted-foreground">{rangeHint}</p>
+          ) : null}
+        </div>
       </CardHeader>
       <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
         {showSkeleton ? (
           <Skeleton className="h-[250px] w-full" />
         ) : data.length === 0 ? (
           <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
-            Chart unavailable
+            {loadedRange?.startsWith("range:")
+              ? "No prices in this date range"
+              : "Chart unavailable"}
           </div>
         ) : (
           <ChartContainer config={{}} className="aspect-auto h-[250px] w-full">
@@ -227,6 +362,7 @@ export function BtcPriceChart() {
                   new Date(value).toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
+                    timeZone: "UTC",
                   })
                 }
               />

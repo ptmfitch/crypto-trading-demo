@@ -37,4 +37,4 @@ Preconditions:
 - The submit button's accessible name stays `BUY BTC` while it is disabled. The snapshot suffix `disabled` is the proof, not a renamed button.
 - A success toast cannot appear on this path. Cash must stay `10000`.
 - `Could Not Load Dashboard` is the missing-wallet screen. Seeing it here means this recipe failed.
-- The chart may show its own `Price delayed` chip and must not collapse to an empty page. A skeleton is only the first paint for a range.
+- The chart may show its own `Price delayed` chip and must not collapse to an empty page. A skeleton is only the first paint for a range. The `From` and `To` date filters stay usable while the quote is delayed.

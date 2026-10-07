@@ -12,12 +12,13 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { loginPathAfterRegister } from "@/lib/login-prefill";
+import { showStatusError, showStatusSuccess } from "@/lib/status-toast";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 
 const formSchema = z.object({
@@ -39,14 +40,13 @@ export default function RegisterPage() {
     startTransition(async () => {
       const result = await registerUser(values);
       if (result.success) {
-        toast.success("Account Created", {
-          description: "You can now log in with your credentials.",
-        });
-        router.push("/login");
+        showStatusSuccess(
+          "Account Created",
+          "You can now log in with your credentials.",
+        );
+        router.push(loginPathAfterRegister(values.email));
       } else {
-        toast.error("Registration Failed", {
-          description: result.error,
-        });
+        showStatusError("Registration Failed", result.error);
       }
     });
   }

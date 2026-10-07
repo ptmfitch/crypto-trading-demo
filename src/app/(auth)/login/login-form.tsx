@@ -21,13 +21,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { TestAccount } from "@/lib/dev-login";
+import { showStatusError, showStatusSuccess } from "@/lib/status-toast";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 
 const formSchema = z.object({
@@ -38,9 +38,11 @@ const formSchema = z.object({
 export default function LoginForm({
   devLoginEnabled,
   testAccounts,
+  initialEmail,
 }: {
   devLoginEnabled: boolean;
   testAccounts: TestAccount[];
+  initialEmail: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -49,7 +51,7 @@ export default function LoginForm({
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { email: initialEmail, password: "" },
   });
 
   const selectedAccount = testAccounts.find(
@@ -65,11 +67,12 @@ export default function LoginForm({
       });
 
       if (result?.error) {
-        toast.error("Login Failed", {
-          description: "Please check your email and password.",
-        });
+        showStatusError(
+          "Login Failed",
+          "Please check your email and password.",
+        );
       } else {
-        toast.success("Login Successful!");
+        showStatusSuccess("Login Successful!");
         router.push("/dashboard");
         router.refresh();
       }
@@ -82,7 +85,7 @@ export default function LoginForm({
     startDevTransition(async () => {
       const result = await signInAsTestAccount(selectedEmail);
       if (result?.error) {
-        toast.error("Login Failed", { description: result.error });
+        showStatusError("Login Failed", result.error);
       }
     });
   }

@@ -49,10 +49,13 @@ Run `drive.mjs start` with the sandbox disabled (Shell `required_permissions: ["
 node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 start
 node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 goto /
 node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 click --role link --name "Create Account"
+node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 fill --role textbox --name "Name" --value "Verify User"
 node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 fill --role textbox --name "Email" --value "verify-user@example.com"
-node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 wait --text "Welcome Back"
-node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 snapshot --out .cursor/skills/verify-tradesim/artifacts/register/login.aria.txt
-node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 screenshot --out .cursor/skills/verify-tradesim/artifacts/register/login.png
+node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 fill --role textbox --name "Password" --value "verify-pass"
+node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 click --role button --name "Create Account"
+node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 wait --text "Welcome Back, Verify User!"
+node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 snapshot --out .cursor/skills/verify-tradesim/artifacts/register/dashboard.aria.txt
+node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 screenshot --out .cursor/skills/verify-tradesim/artifacts/register/dashboard.png
 node .cursor/skills/verify-tradesim/scripts/drive.mjs --port 4173 stop
 ```
 

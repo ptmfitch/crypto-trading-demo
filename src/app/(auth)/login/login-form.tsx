@@ -2,6 +2,7 @@
 
 import { syncLocaleCookie } from "@/actions/locale";
 import { signInAsTestAccount, type DevLoginErrorCode } from "@/actions/dev-login";
+import { queueLoginSuccessToast } from "@/components/LoginSuccessToast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -82,7 +83,8 @@ export default function LoginForm({
         });
       } else {
         await syncLocaleCookie();
-        toast.success(messages.auth.loginSuccessful);
+        // Full navigation unloads this document before Sonner can paint.
+        queueLoginSuccessToast();
         window.location.assign("/dashboard");
       }
     });

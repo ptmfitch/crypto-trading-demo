@@ -1,3 +1,4 @@
+import { LoginSuccessToast } from "@/components/LoginSuccessToast";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { getDictionary } from "@/i18n/get-dictionary";
@@ -35,6 +36,7 @@ export default async function RootLayout({
           >
             {children}
             <Toaster richColors position="top-right" />
+            <LoginSuccessToast />
           </ThemeProvider>
         </LocaleProvider>
       </body>

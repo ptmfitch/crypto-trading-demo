@@ -9,7 +9,6 @@ import {
   type Locale,
 } from "./config";
 import { en, type Messages } from "./en";
-import { setLocaleCookie } from "./locale-cookie";
 import { sv } from "./sv";
 
 const dictionaries: Record<Locale, Messages> = { en, sv };
@@ -35,7 +34,7 @@ export async function getDictionary(): Promise<{
       select: { locale: true },
     });
     const locale = parseLocale(user?.locale);
-    await setLocaleCookie(locale);
+    // Cookie writes throw during render. Login and locale actions persist the cookie.
     return { locale, messages: dictionaries[locale] };
   }
 

@@ -1,21 +1,24 @@
 "use server";
 
+import { getDictionary } from "@/i18n/get-dictionary";
+import { createRegisterActionSchema } from "@/i18n/schemas";
 import prisma from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
-const RegisterSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-});
+export type RegisterErrorCode =
+  | "invalidFields"
+  | "emailTaken"
+  | "somethingWentWrong";
 
-export async function registerUser(values: z.infer<typeof RegisterSchema>) {
+export async function registerUser(values: z.infer<ReturnType<typeof createRegisterActionSchema>>) {
+  const { messages } = await getDictionary();
+  const RegisterSchema = createRegisterActionSchema(messages);
   const validatedFields = RegisterSchema.safeParse(values);
 
   if (!validatedFields.success) {
-    return { error: "Invalid fields!" };
+    return { error: "invalidFields" as RegisterErrorCode };
   }
 
   const { name, email, password } = validatedFields.data;
@@ -38,13 +41,13 @@ export async function registerUser(values: z.infer<typeof RegisterSchema>) {
       });
     });
 
-    return { success: "User created successfully! Please log in." };
+    return { success: true as const };
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2002") {
-        return { error: "An account with this email already exists." };
+        return { error: "emailTaken" as RegisterErrorCode };
       }
     }
-    return { error: "Something went wrong." };
+    return { error: "somethingWentWrong" as RegisterErrorCode };
   }
 }

@@ -15,6 +15,10 @@ export function LoginSuccessToast() {
 
   useEffect(() => {
     if (sessionStorage.getItem(STORAGE_KEY) !== "1") return;
+    // This component is already mounted on /login. syncLocaleCookie revalidates
+    // the layout there, and this effect would otherwise clear the flag and toast
+    // on that document before /dashboard loads.
+    if (window.location.pathname === "/login") return;
     sessionStorage.removeItem(STORAGE_KEY);
     toast.success(messages.auth.loginSuccessful);
   }, [messages.auth.loginSuccessful]);

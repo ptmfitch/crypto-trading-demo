@@ -1,0 +1,26 @@
+RootWebArea "Crypto Trading Simulator"
+              StaticText "Welcome Back"
+                paragraph
+                  StaticText "Test account"
+                  StaticText "Development"
+              combobox "Test account"
+                  StaticText "Choose an account"
+              button "Continue as this account" disabled
+                StaticText "Continue as this account"
+                  StaticText "or use email and password"
+                LabelText
+                  StaticText "Email"
+                textbox "Email"
+                LabelText
+                  StaticText "Password"
+                textbox "Password"
+              button "Login"
+                StaticText "Login"
+            paragraph
+              StaticText "Don't have an account?"
+              link "Register"
+                StaticText "Register"
+      region "Notifications alt+T"
+        alert
+                  button "Open Next.js Dev Tools"
+                    image

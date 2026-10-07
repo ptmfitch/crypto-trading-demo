@@ -357,6 +357,10 @@ SELECT COUNT(*) AS trades
 FROM Trade t
 JOIN User u ON u.id = t.userId
 WHERE u.email = '$email_sql';
+SELECT r.cadence, r.usdtAmount, r.nextRunAt
+FROM RecurringBuy r
+JOIN User u ON u.id = r.userId
+WHERE u.email = '$email_sql';
 SQL
 }
 

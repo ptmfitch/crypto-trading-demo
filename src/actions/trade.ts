@@ -31,6 +31,10 @@ export async function executeTrade(values: z.infer<typeof TradeSchema>) {
     tradeType === "BUY"
       ? Number.parseInt(submittedAmount.toString(), 10)
       : submittedAmount;
+  // Truncation can turn a positive fraction into 0; that must not fill.
+  if (!(amount > 0)) {
+    return { error: "Invalid input" };
+  }
 
   const tradable = assertTradableQuote(await getBtcQuote());
   if (!tradable.ok) {

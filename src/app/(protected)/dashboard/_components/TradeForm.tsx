@@ -153,13 +153,32 @@ export function TradeForm({
           onValueChange={(value) => setTradeType(value as "BUY" | "SELL")}
           className="w-full"
         >
+          {/* Both sides edit one order form, so both tabs control that panel. */}
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="BUY">Buy</TabsTrigger>
-            <TabsTrigger value="SELL">Sell</TabsTrigger>
+            <TabsTrigger
+              id="trade-tab-buy"
+              value="BUY"
+              aria-controls="trade-order-panel"
+            >
+              Buy
+            </TabsTrigger>
+            <TabsTrigger
+              id="trade-tab-sell"
+              value="SELL"
+              aria-controls="trade-order-panel"
+            >
+              Sell
+            </TabsTrigger>
           </TabsList>
         </Tabs>
       </CardHeader>
-      <CardContent>
+      <CardContent
+        id="trade-order-panel"
+        role="tabpanel"
+        aria-labelledby={
+          tradeType === "BUY" ? "trade-tab-buy" : "trade-tab-sell"
+        }
+      >
         <div className="mb-4 flex items-center justify-between gap-3">
           <span
             className={cn(

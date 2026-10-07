@@ -76,7 +76,7 @@ export default async function DashboardPage() {
   const data = await getDashboardData(session.user.id);
   if (!data) {
     return (
-      <main className="flex-1 bg-muted/40">
+      <div className="flex-1 bg-muted/40">
         <div className="container mx-auto py-8 text-center">
           <h2 className="text-xl font-semibold text-destructive">
             Could Not Load Dashboard
@@ -86,7 +86,7 @@ export default async function DashboardPage() {
             page.
           </p>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -102,7 +102,7 @@ export default async function DashboardPage() {
         : undefined;
 
   return (
-    <main className="flex-1 bg-muted/40">
+    <div className="flex-1 bg-muted/40">
       <div className="container mx-auto py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold">
@@ -164,6 +164,6 @@ export default async function DashboardPage() {
           </div>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

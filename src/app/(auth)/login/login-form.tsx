@@ -3,7 +3,7 @@
 import { signInAsTestAccount } from "@/actions/dev-login";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -88,10 +88,12 @@ export default function LoginForm({
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-zinc-950">
+    <main className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-zinc-950">
       <Card className="w-[400px]">
         <CardHeader>
-          <CardTitle>Welcome Back</CardTitle>
+          <h1 data-slot="card-title" className="leading-none font-semibold">
+            Welcome Back
+          </h1>
         </CardHeader>
         <CardContent>
           {devLoginEnabled ? (
@@ -194,6 +196,6 @@ export default function LoginForm({
           </p>
         </CardContent>
       </Card>
-    </div>
+    </main>
   );
 }

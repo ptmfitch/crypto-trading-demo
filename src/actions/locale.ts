@@ -1,18 +1,10 @@
 "use server";
 
 import { auth } from "@/auth";
-import { LOCALE_COOKIE, parseLocale, type Locale } from "@/i18n/config";
+import { parseLocale, type Locale } from "@/i18n/config";
+import { setLocaleCookie } from "@/i18n/locale-cookie";
 import prisma from "@/lib/prisma";
-import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-
-async function setLocaleCookie(locale: Locale) {
-  const cookieStore = await cookies();
-  cookieStore.set(LOCALE_COOKIE, locale, {
-    path: "/",
-    sameSite: "lax",
-  });
-}
 
 export async function updateLocale(locale: string) {
   const session = await auth();

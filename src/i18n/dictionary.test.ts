@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { parseLocale } from "./config.ts";
+import {
+  isValidLocaleCookie,
+  LOCALE_COOKIE_MAX_AGE,
+  parseLocale,
+} from "./config.ts";
 import { en } from "./en.ts";
 import { sv } from "./sv.ts";
 import { t } from "./translate.ts";
@@ -43,6 +47,18 @@ describe("dictionary", () => {
     assert.equal(parseLocale(""), "en");
     assert.equal(parseLocale("fr"), "en");
     assert.equal(parseLocale("sv"), "sv");
+  });
+
+  it("isValidLocaleCookie accepts only en and sv", () => {
+    assert.equal(isValidLocaleCookie("en"), true);
+    assert.equal(isValidLocaleCookie("sv"), true);
+    assert.equal(isValidLocaleCookie(undefined), false);
+    assert.equal(isValidLocaleCookie(""), false);
+    assert.equal(isValidLocaleCookie("fr"), false);
+  });
+
+  it("locale cookie maxAge matches 30-day session default", () => {
+    assert.equal(LOCALE_COOKIE_MAX_AGE, 30 * 24 * 60 * 60);
   });
 
   it("interpolates known placeholders and leaves unknown ones", () => {

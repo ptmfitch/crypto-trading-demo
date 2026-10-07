@@ -2,10 +2,10 @@
 
 import { AuthError } from "next-auth";
 import { signIn } from "@/auth";
-import { LOCALE_COOKIE, parseLocale } from "@/i18n/config";
+import { parseLocale } from "@/i18n/config";
+import { setLocaleCookie } from "@/i18n/locale-cookie";
 import { isDevLoginEnabled } from "@/lib/dev-login";
 import prisma from "@/lib/prisma";
-import { cookies } from "next/headers";
 
 export type DevLoginErrorCode =
   | "devLoginOff"
@@ -32,11 +32,7 @@ export async function signInAsTestAccount(email: string) {
   }
 
   const locale = parseLocale(account.locale);
-  const cookieStore = await cookies();
-  cookieStore.set(LOCALE_COOKIE, locale, {
-    path: "/",
-    sameSite: "lax",
-  });
+  await setLocaleCookie(locale);
 
   try {
     await signIn("credentials", {

@@ -25,6 +25,8 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-profit: var(--profit);
+  --color-loss: var(--loss);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -78,6 +80,9 @@
   --sidebar-ring: oklch(0.708 0 0);
   --chart-positive: 142 76% 36%;
   --chart-negative: 0 84% 60%;
+  /* Body text has to clear 4.5:1 on white. #00c950 and #fb2c36 do not. */
+  --profit: #15803d;
+  --loss: #b91c1c;
 }
 
 .dark {
@@ -114,6 +119,9 @@
   --sidebar-ring: oklch(0.556 0 0);
   --chart-positive: 142 60% 46%;
   --chart-negative: 0 72% 55%;
+  /* Same greens and reds that already clear 4.5:1 on the dark card. */
+  --profit: #00c950;
+  --loss: #fb2c36;
 }
 
 @layer base {
@@ -139,4 +147,10 @@
   .toggle-group-item {
     @apply cursor-pointer;
   }
+}
+
+/* The chart surface is in the tab order. outline-hidden on it removed the ring. */
+.recharts-surface:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
 }

@@ -22,6 +22,16 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  bitcoinChartName,
+  btcChartRangeLabel,
+  btcChartRanges,
+  chartChangeSummary,
+  chartRangeName,
+  formatBtcAxisTick,
+  formatChartDate,
+  formatChartPrice,
+} from "@/lib/btc-chart";
+import {
   quoteDelayLabel,
   type BtcQuoteStatus,
 } from "@/lib/btc-quote";
@@ -36,13 +46,6 @@ import {
 } from "recharts";
 
 type ChartDataPoint = { date: string; price: number };
-
-const timeRangeOptions = [
-  { label: "Last 7 Days", value: "7" },
-  { label: "Last 30 Days", value: "30" },
-  { label: "Last 3 Months", value: "90" },
-  { label: "Last Year", value: "365" },
-];
 
 function chartStatus(value: unknown): BtcQuoteStatus | null {
   if (value === "fresh" || value === "stale" || value === "unavailable") {
@@ -147,6 +150,12 @@ export function BtcPriceChart() {
   const fillColorId = isPositiveChange ? "fillPositive" : "fillNegative";
   const showSkeleton = isLoading && loadedRange !== timeRange;
   const delayLabel = quoteDelayLabel(quoteStatus);
+  const rangeLabel = btcChartRangeLabel(timeRange);
+  const chartName = bitcoinChartName(rangeLabel);
+  const summary =
+    data.length === 0
+      ? "Chart unavailable"
+      : chartChangeSummary(priceChange.value, priceChange.percent);
 
   return (
     <Card>
@@ -156,21 +165,17 @@ export function BtcPriceChart() {
             Bitcoin Price
             {delayLabel ? <Badge variant="outline">{delayLabel}</Badge> : null}
           </CardTitle>
-          <CardDescription>
-            {data.length === 0
-              ? "Chart unavailable"
-              : `${isPositiveChange ? "Increased" : "Decreased"} by $${priceChange.value.toFixed(2)} (${priceChange.percent.toFixed(2)}%)`}
-          </CardDescription>
+          <CardDescription id="btc-price-summary">{summary}</CardDescription>
         </div>
         <Select value={timeRange} onValueChange={setTimeRange}>
           <SelectTrigger
             className="w-[160px] rounded-lg sm:ml-auto"
-            aria-label="Select a value"
+            aria-label={chartRangeName(rangeLabel)}
           >
             <SelectValue placeholder="Select time range" />
           </SelectTrigger>
           <SelectContent className="rounded-xl">
-            {timeRangeOptions.map(({ label, value }) => (
+            {btcChartRanges.map(({ label, value }) => (
               <SelectItem key={value} value={value} className="rounded-lg">
                 {label}
               </SelectItem>
@@ -187,7 +192,13 @@ export function BtcPriceChart() {
           </div>
         ) : (
           <ChartContainer config={{}} className="aspect-auto h-[250px] w-full">
-            <AreaChart data={data}>
+            <AreaChart
+              data={data}
+              title={chartName}
+              aria-label={chartName}
+              aria-describedby="btc-price-summary"
+              desc={summary}
+            >
               <defs>
                 <linearGradient id="fillPositive" x1="0" y1="0" x2="0" y2="1">
                   <stop
@@ -227,6 +238,7 @@ export function BtcPriceChart() {
                   new Date(value).toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
+                    timeZone: "UTC",
                   })
                 }
               />
@@ -235,16 +247,15 @@ export function BtcPriceChart() {
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
-                tickFormatter={(value) =>
-                  `$${(Number(value) / 100).toFixed(1)}k`
-                }
+                tickFormatter={(value) => formatBtcAxisTick(Number(value))}
               />
               <ChartTooltip
                 cursor={false}
                 content={
                   <ChartTooltipContent
                     indicator="dot"
-                    formatter={(value) => `$${Number(value).toLocaleString()}`}
+                    labelFormatter={(label) => formatChartDate(String(label))}
+                    formatter={(value) => formatChartPrice(Number(value))}
                   />
                 }
               />

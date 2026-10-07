@@ -20,6 +20,7 @@ model User {
     sessions Session[]
     wallet   Wallet?
     trades   Trade[]
+    orders   Order[]
 }
 
 model Wallet {
@@ -27,6 +28,8 @@ model Wallet {
     userId      String  @unique
     usdtBalance Decimal @default(10000.00)
     btcBalance  Decimal @default(0.00)
+    ethBalance  Decimal @default(0.00)
+    solBalance  Decimal @default(0.00)
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -38,9 +41,32 @@ model Trade {
     btcAmount    Decimal
     usdtAmount   Decimal
     priceAtTrade Decimal
+    assetId      String   @default("bitcoin")
     timestamp    DateTime @default(now())
 
-    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    order Order?
+}
+
+model Order {
+    id            String    @id @default(cuid())
+    userId        String
+    side          String
+    assetId       String
+    limitPrice    Decimal
+    baseAmount    Decimal
+    quoteReserved Decimal
+    status        String
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+    filledAt      DateTime?
+    canceledAt    DateTime?
+    tradeId       String?   @unique
+
+    user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    trade Trade? @relation(fields: [tradeId], references: [id], onDelete: SetNull)
+
+    @@index([userId, status])
 }
 
 model Account {

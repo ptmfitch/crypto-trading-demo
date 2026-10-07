@@ -16,10 +16,11 @@ model User {
     createdAt      DateTime @default(now())
     updatedAt      DateTime @updatedAt
 
-    accounts Account[]
-    sessions Session[]
-    wallet   Wallet?
-    trades   Trade[]
+    accounts    Account[]
+    sessions    Session[]
+    wallet      Wallet?
+    trades      Trade[]
+    priceAlerts PriceAlert[]
 }
 
 model Wallet {
@@ -41,6 +42,21 @@ model Trade {
     timestamp    DateTime @default(now())
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PriceAlert {
+    id           String    @id @default(cuid())
+    userId       String
+    assetId      String
+    direction    String
+    thresholdUsd Decimal
+    status       String
+    triggeredAt  DateTime?
+    createdAt    DateTime  @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId, status])
 }
 
 model Account {

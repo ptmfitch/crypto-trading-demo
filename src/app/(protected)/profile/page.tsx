@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { localeToDateLocale, parseLocale } from "@/i18n/config";
+import { localeToDateLocale } from "@/i18n/config";
 import { getDictionary } from "@/i18n/get-dictionary";
 import prisma from "@/lib/prisma";
 import {
@@ -87,12 +87,6 @@ export default async function ProfilePage() {
   const { locale, messages } = await getDictionary();
   const dateLocale = localeToDateLocale(locale);
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { locale: true },
-  });
-  const userLocale = parseLocale(user?.locale);
-
   const trades = await prisma.trade.findMany({
     where: { userId: session.user.id },
     orderBy: { timestamp: "asc" },
@@ -137,7 +131,7 @@ export default async function ProfilePage() {
             )}
           </div>
           <div className="lg:col-span-1 space-y-6">
-            <LanguageSelect value={userLocale} />
+            <LanguageSelect value={locale} />
             <StatCard
               title={messages.profile.lifetimePnl}
               value={`$${finalPnl.toLocaleString()}`}

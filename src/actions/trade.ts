@@ -26,7 +26,11 @@ export async function executeTrade(values: z.infer<typeof TradeSchema>) {
     return { error: "Invalid input" };
   }
 
-  const { amount, tradeType, asset } = validatedFields.data;
+  const { amount: submittedAmount, tradeType, asset } = validatedFields.data;
+  const amount =
+    tradeType === "BUY"
+      ? Number.parseInt(submittedAmount.toString(), 10)
+      : submittedAmount;
 
   const tradable = assertTradableQuote(await getBtcQuote());
   if (!tradable.ok) {

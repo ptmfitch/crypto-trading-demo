@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/auth";
-import { parseLocale, type Locale } from "@/i18n/config";
+import { parseLocale } from "@/i18n/config";
 import { setLocaleCookie } from "@/i18n/locale-cookie";
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
@@ -41,6 +41,7 @@ export async function syncLocaleCookie() {
 
   const locale = parseLocale(user?.locale);
   await setLocaleCookie(locale);
+  revalidatePath("/", "layout");
 
   return { success: true as const, locale };
 }

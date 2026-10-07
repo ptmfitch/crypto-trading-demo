@@ -28,7 +28,6 @@ import type { TestAccount } from "@/lib/dev-login";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -54,7 +53,6 @@ export default function LoginForm({
   devLoginEnabled: boolean;
   testAccounts: TestAccount[];
 }) {
-  const router = useRouter();
   const { messages } = useMessages();
   const formSchema = useMemo(() => createLoginSchema(messages), [messages]);
   const [isPending, startTransition] = useTransition();
@@ -85,8 +83,7 @@ export default function LoginForm({
       } else {
         await syncLocaleCookie();
         toast.success(messages.auth.loginSuccessful);
-        router.push("/dashboard");
-        router.refresh();
+        window.location.assign("/dashboard");
       }
     });
   }

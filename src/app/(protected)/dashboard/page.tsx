@@ -4,8 +4,13 @@ import { DollarSign, ListChecks, TrendingUp, Wallet } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { StatCard } from "@/components/StatCard";
+import { getDictionary } from "@/i18n/get-dictionary";
 import { getBtcQuote } from "@/lib/btc-market";
-import { quoteDelayLabel, type BtcQuoteStatus } from "@/lib/btc-quote";
+import {
+  quoteDelayLabel,
+  type BtcQuoteStatus,
+  type QuoteDelayCode,
+} from "@/lib/btc-quote";
 import { BtcPriceChart } from "./_components/BtcPriceChart";
 import { TradeForm } from "./_components/TradeForm";
 
@@ -42,7 +47,21 @@ async function getDashboardData(userId: string) {
   return { wallet, tradeCount, quote, totalValue, pnl };
 }
 
-function priceStat(status: BtcQuoteStatus, usd: number | null) {
+function translateDelayCode(
+  code: QuoteDelayCode | null,
+  messages: { priceDelayed: string; priceUnavailable: string }
+) {
+  if (!code) return undefined;
+  return code === "priceDelayed"
+    ? messages.priceDelayed
+    : messages.priceUnavailable;
+}
+
+function priceStat(
+  status: BtcQuoteStatus,
+  usd: number | null,
+  messages: { priceDelayed: string; priceUnavailable: string }
+) {
   switch (status) {
     case "fresh":
       return {
@@ -53,13 +72,13 @@ function priceStat(status: BtcQuoteStatus, usd: number | null) {
     case "stale":
       return {
         value: usd == null ? "—" : formatUsd(usd),
-        description: quoteDelayLabel(status) ?? undefined,
+        description: translateDelayCode(quoteDelayLabel(status), messages),
         color: "text-muted-foreground",
       };
     case "unavailable":
       return {
         value: "—",
-        description: quoteDelayLabel(status) ?? undefined,
+        description: translateDelayCode(quoteDelayLabel(status), messages),
         color: "text-muted-foreground",
       };
     default: {
@@ -73,18 +92,18 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
+  const { messages } = await getDictionary();
+  const t = messages.dashboard;
+
   const data = await getDashboardData(session.user.id);
   if (!data) {
     return (
       <main className="flex-1 bg-muted/40">
         <div className="container mx-auto py-8 text-center">
           <h2 className="text-xl font-semibold text-destructive">
-            Could Not Load Dashboard
+            {t.loadErrorTitle}
           </h2>
-          <p className="text-muted-foreground">
-            There was a problem loading your wallet. Please try refreshing the
-            page.
-          </p>
+          <p className="text-muted-foreground">{t.loadErrorDescription}</p>
         </div>
       </main>
     );
@@ -93,35 +112,34 @@ export default async function DashboardPage() {
   const { wallet, quote, totalValue, pnl, tradeCount } = data;
   const pnlColor =
     pnl == null ? "text-muted-foreground" : pnl >= 0 ? "text-green-500" : "text-red-500";
-  const price = priceStat(quote.status, quote.usd);
+  const price = priceStat(quote.status, quote.usd, t);
   const portfolioDescription =
     quote.status === "stale"
-      ? "Includes a delayed BTC quote"
+      ? t.includesDelayedQuote
       : quote.status === "unavailable" && totalValue == null
-        ? "BTC value unavailable"
+        ? t.btcValueUnavailable
         : undefined;
+
+  const displayName = session.user.name || t.traderFallback;
+  const welcomeTitle = t.welcomeBack.replace("{name}", displayName);
 
   return (
     <main className="flex-1 bg-muted/40">
       <div className="container mx-auto py-8">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold">
-            Welcome Back, {session.user.name || "Trader"}!
-          </h1>
-          <p className="text-muted-foreground">
-            Here&apos;s your trading dashboard overview.
-          </p>
+          <h1 className="text-3xl font-bold">{welcomeTitle}</h1>
+          <p className="text-muted-foreground">{t.overview}</p>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-6">
           <StatCard
-            title="Portfolio Value"
+            title={t.portfolioValue}
             value={totalValue == null ? "—" : formatUsd(totalValue)}
             icon={Wallet}
             description={portfolioDescription}
           />
           <StatCard
-            title="Total P&L"
+            title={t.totalPnl}
             value={
               pnl == null
                 ? "—"
@@ -131,18 +149,18 @@ export default async function DashboardPage() {
             color={pnlColor}
             href="/profile"
             description={
-              quote.status === "stale" ? "Includes a delayed BTC quote" : undefined
+              quote.status === "stale" ? t.includesDelayedQuote : undefined
             }
           />
           <StatCard
-            title="Live BTC Price"
+            title={t.liveBtcPrice}
             value={price.value}
             icon={DollarSign}
             color={price.color}
             description={price.description}
           />
           <StatCard
-            title="Total Trades"
+            title={t.totalTrades}
             value={tradeCount.toString()}
             icon={ListChecks}
             href="/profile"

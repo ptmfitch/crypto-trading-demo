@@ -1,9 +1,10 @@
 export const FRESH_TTL_MS = 60_000;
 
-export const TRADE_PAUSED_ERROR =
-  "Trading is paused until a live BTC quote returns.";
+export const TRADE_PAUSED_ERROR = "tradePaused";
 
 export type BtcQuoteStatus = "fresh" | "stale" | "unavailable";
+
+export type QuoteDelayCode = "priceDelayed" | "priceUnavailable";
 
 export type CachedQuote = {
   usd: number;
@@ -24,14 +25,14 @@ export type ResolvedQuote = {
   nextCache: CachedQuote | null;
 };
 
-export function quoteDelayLabel(status: BtcQuoteStatus): string | null {
+export function quoteDelayLabel(status: BtcQuoteStatus): QuoteDelayCode | null {
   switch (status) {
     case "fresh":
       return null;
     case "stale":
-      return "Price delayed";
+      return "priceDelayed";
     case "unavailable":
-      return "Price unavailable";
+      return "priceUnavailable";
     default: {
       const exhaustive: never = status;
       return exhaustive;

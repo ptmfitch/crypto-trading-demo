@@ -1,6 +1,8 @@
 "use client";
 
-import { signInAsTestAccount } from "@/actions/dev-login";
+import { syncLocaleCookie } from "@/actions/locale";
+import { signInAsTestAccount, type DevLoginErrorCode } from "@/actions/dev-login";
+import { queueLoginSuccessToast } from "@/components/LoginSuccessToast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,20 +22,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useMessages } from "@/i18n/locale-provider";
+import { createLoginSchema } from "@/i18n/schemas";
+import type { Messages } from "@/i18n/en";
 import type { TestAccount } from "@/lib/dev-login";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-const formSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1, "Password is required"),
-});
+function devLoginErrorMessage(
+  code: DevLoginErrorCode,
+  messages: Messages
+): string {
+  const map: Record<DevLoginErrorCode, string> = {
+    devLoginOff: messages.auth.devLoginOff,
+    testAccountNotFound: messages.auth.testAccountNotFound,
+    authSecretMissing: messages.auth.authSecretMissing,
+    devSignInFailed: messages.auth.devSignInFailed,
+  };
+  return map[code];
+}
 
 export default function LoginForm({
   devLoginEnabled,
@@ -42,7 +54,8 @@ export default function LoginForm({
   devLoginEnabled: boolean;
   testAccounts: TestAccount[];
 }) {
-  const router = useRouter();
+  const { messages } = useMessages();
+  const formSchema = useMemo(() => createLoginSchema(messages), [messages]);
   const [isPending, startTransition] = useTransition();
   const [isDevPending, startDevTransition] = useTransition();
   const [selectedEmail, setSelectedEmail] = useState<string>("");
@@ -65,13 +78,14 @@ export default function LoginForm({
       });
 
       if (result?.error) {
-        toast.error("Login Failed", {
-          description: "Please check your email and password.",
+        toast.error(messages.auth.loginFailed, {
+          description: messages.auth.loginFailedDescription,
         });
       } else {
-        toast.success("Login Successful!");
-        router.push("/dashboard");
-        router.refresh();
+        await syncLocaleCookie();
+        // Full navigation unloads this document before Sonner can paint.
+        queueLoginSuccessToast();
+        window.location.assign("/dashboard");
       }
     });
   }
@@ -82,7 +96,9 @@ export default function LoginForm({
     startDevTransition(async () => {
       const result = await signInAsTestAccount(selectedEmail);
       if (result?.error) {
-        toast.error("Login Failed", { description: result.error });
+        toast.error(messages.auth.loginFailed, {
+          description: devLoginErrorMessage(result.error, messages),
+        });
       }
     });
   }
@@ -91,20 +107,23 @@ export default function LoginForm({
     <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-zinc-950">
       <Card className="w-[400px]">
         <CardHeader>
-          <CardTitle>Welcome Back</CardTitle>
+          <CardTitle>{messages.auth.welcomeBack}</CardTitle>
         </CardHeader>
         <CardContent>
           {devLoginEnabled ? (
             <div className="mb-6 space-y-3">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-medium">Test account</p>
-                <Badge variant="outline">Development</Badge>
+                <p className="text-sm font-medium">{messages.auth.testAccount}</p>
+                <Badge variant="outline">{messages.auth.development}</Badge>
               </div>
               {testAccounts.length > 0 ? (
                 <>
                   <Select value={selectedEmail} onValueChange={setSelectedEmail}>
-                    <SelectTrigger className="w-full" aria-label="Test account">
-                      <SelectValue placeholder="Choose an account" />
+                    <SelectTrigger
+                      className="w-full"
+                      aria-label={messages.auth.testAccount}
+                    >
+                      <SelectValue placeholder={messages.auth.chooseAccount} />
                     </SelectTrigger>
                     <SelectContent>
                       {testAccounts.map((account) => (
@@ -125,18 +144,20 @@ export default function LoginForm({
                     disabled={!selectedEmail || isDevPending}
                     onClick={onDevSignIn}
                   >
-                    {isDevPending ? "Signing in..." : "Continue as this account"}
+                    {isDevPending
+                      ? messages.auth.signingIn
+                      : messages.auth.continueAsAccount}
                   </Button>
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  No test accounts are in the local database yet.
+                  {messages.auth.noTestAccounts}
                 </p>
               )}
               <div className="flex items-center gap-3 pt-1">
                 <div className="h-px flex-1 bg-border" />
                 <span className="text-xs text-muted-foreground">
-                  or use email and password
+                  {messages.auth.orUseEmailPassword}
                 </span>
                 <div className="h-px flex-1 bg-border" />
               </div>
@@ -149,7 +170,7 @@ export default function LoginForm({
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{messages.auth.email}</FormLabel>
                     <FormControl>
                       <Input
                         type="email"
@@ -166,7 +187,7 @@ export default function LoginForm({
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>{messages.auth.password}</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
@@ -179,17 +200,17 @@ export default function LoginForm({
                 )}
               />
               <Button type="submit" className="w-full" disabled={isPending}>
-                {isPending ? "Logging in..." : "Login"}
+                {isPending ? messages.auth.loggingIn : messages.shell.login}
               </Button>
             </form>
           </Form>
           <p className="mt-4 text-center text-sm text-gray-600">
-            Don&apos;t have an account?{" "}
+            {messages.auth.dontHaveAccount}{" "}
             <Link
               href="/register"
               className="font-semibold text-primary hover:underline"
             >
-              Register
+              {messages.auth.register}
             </Link>
           </p>
         </CardContent>

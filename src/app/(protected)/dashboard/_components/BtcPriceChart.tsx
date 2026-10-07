@@ -21,9 +21,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useMessages } from "@/i18n/locale-provider";
 import {
   quoteDelayLabel,
   type BtcQuoteStatus,
+  type QuoteDelayCode,
 } from "@/lib/btc-quote";
 import * as React from "react";
 import {
@@ -37,12 +39,7 @@ import {
 
 type ChartDataPoint = { date: string; price: number };
 
-const timeRangeOptions = [
-  { label: "Last 7 Days", value: "7" },
-  { label: "Last 30 Days", value: "30" },
-  { label: "Last 3 Months", value: "90" },
-  { label: "Last Year", value: "365" },
-];
+const timeRangeValues = ["7", "30", "90", "365"] as const;
 
 function chartStatus(value: unknown): BtcQuoteStatus | null {
   if (value === "fresh" || value === "stale" || value === "unavailable") {
@@ -51,7 +48,44 @@ function chartStatus(value: unknown): BtcQuoteStatus | null {
   return null;
 }
 
+function translateDelayCode(
+  code: QuoteDelayCode | null,
+  messages: { priceDelayed: string; priceUnavailable: string }
+) {
+  if (!code) return null;
+  return code === "priceDelayed"
+    ? messages.priceDelayed
+    : messages.priceUnavailable;
+}
+
+function rangeLabel(
+  value: string,
+  messages: {
+    last7Days: string;
+    last30Days: string;
+    last3Months: string;
+    lastYear: string;
+  }
+) {
+  switch (value) {
+    case "7":
+      return messages.last7Days;
+    case "30":
+      return messages.last30Days;
+    case "90":
+      return messages.last3Months;
+    case "365":
+      return messages.lastYear;
+    default:
+      return value;
+  }
+}
+
 export function BtcPriceChart() {
+  const { locale, messages } = useMessages();
+  const t = messages.chart;
+  const dateLocale = locale === "sv" ? "sv-SE" : "en-US";
+
   const [data, setData] = React.useState<ChartDataPoint[]>([]);
   const [loadedRange, setLoadedRange] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -146,33 +180,36 @@ export function BtcPriceChart() {
     : "hsl(var(--chart-negative))";
   const fillColorId = isPositiveChange ? "fillPositive" : "fillNegative";
   const showSkeleton = isLoading && loadedRange !== timeRange;
-  const delayLabel = quoteDelayLabel(quoteStatus);
+  const delayLabel = translateDelayCode(quoteDelayLabel(quoteStatus), t);
+
+  const changeDescription =
+    data.length === 0
+      ? t.chartUnavailable
+      : (isPositiveChange ? t.increased : t.decreased)
+          .replace("{amount}", `$${priceChange.value.toFixed(2)}`)
+          .replace("{percent}", priceChange.percent.toFixed(2));
 
   return (
     <Card>
       <CardHeader className="flex flex-col items-start gap-4 space-y-0 border-b py-5 sm:flex-row sm:items-center sm:gap-6">
         <div className="grid flex-1 gap-1">
           <CardTitle className="flex items-center gap-2">
-            Bitcoin Price
+            {t.bitcoinPrice}
             {delayLabel ? <Badge variant="outline">{delayLabel}</Badge> : null}
           </CardTitle>
-          <CardDescription>
-            {data.length === 0
-              ? "Chart unavailable"
-              : `${isPositiveChange ? "Increased" : "Decreased"} by $${priceChange.value.toFixed(2)} (${priceChange.percent.toFixed(2)}%)`}
-          </CardDescription>
+          <CardDescription>{changeDescription}</CardDescription>
         </div>
         <Select value={timeRange} onValueChange={setTimeRange}>
           <SelectTrigger
             className="w-[160px] rounded-lg sm:ml-auto"
-            aria-label="Select a value"
+            aria-label={t.selectAValue}
           >
-            <SelectValue placeholder="Select time range" />
+            <SelectValue placeholder={t.selectTimeRange} />
           </SelectTrigger>
           <SelectContent className="rounded-xl">
-            {timeRangeOptions.map(({ label, value }) => (
+            {timeRangeValues.map((value) => (
               <SelectItem key={value} value={value} className="rounded-lg">
-                {label}
+                {rangeLabel(value, t)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -183,7 +220,7 @@ export function BtcPriceChart() {
           <Skeleton className="h-[250px] w-full" />
         ) : data.length === 0 ? (
           <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
-            Chart unavailable
+            {t.chartUnavailable}
           </div>
         ) : (
           <ChartContainer config={{}} className="aspect-auto h-[250px] w-full">
@@ -224,7 +261,7 @@ export function BtcPriceChart() {
                 axisLine={false}
                 tickMargin={8}
                 tickFormatter={(value) =>
-                  new Date(value).toLocaleDateString("en-US", {
+                  new Date(value).toLocaleDateString(dateLocale, {
                     month: "short",
                     day: "numeric",
                   })

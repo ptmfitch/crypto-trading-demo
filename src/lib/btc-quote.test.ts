@@ -46,7 +46,7 @@ describe("resolveBtcQuote", () => {
     });
     assert.equal(quote.status, "stale");
     assert.equal(quote.usd, 64000);
-    assert.equal(quoteDelayLabel(quote.status), "Price delayed");
+    assert.equal(quoteDelayLabel(quote.status), "priceDelayed");
     assert.equal(quote.nextCache, null);
   });
 
@@ -68,7 +68,7 @@ describe("resolveBtcQuote", () => {
     });
     assert.equal(quote.status, "unavailable");
     assert.equal(quote.usd, null);
-    assert.equal(quoteDelayLabel(quote.status), "Price unavailable");
+    assert.equal(quoteDelayLabel(quote.status), "priceUnavailable");
   });
 
   it("ignores a corrupt cache", () => {

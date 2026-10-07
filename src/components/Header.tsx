@@ -23,8 +23,8 @@ export async function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <nav className="container mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-        <div className="flex items-center space-x-6">
+      <nav className="container mx-auto flex min-h-16 w-full min-w-0 flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-1">
           <Link href="/dashboard" className="text-xl font-bold">
             TradeSim
           </Link>
@@ -41,8 +41,8 @@ export async function Header() {
             Profile
           </Link>
         </div>
-        <div className="flex items-center space-x-4">
-          <span className="text-sm text-muted-foreground">
+        <div className="ml-auto flex min-w-0 max-w-full items-center gap-4">
+          <span className="min-w-0 truncate text-sm text-muted-foreground">
             {session?.user?.name || session?.user?.email}
           </span>
           <ThemeSwitcher />

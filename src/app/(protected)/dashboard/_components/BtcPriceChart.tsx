@@ -120,7 +120,12 @@ export function BtcPriceChart() {
             ? payload.points
             : null;
         const status = chartStatus(payload?.status);
-        if (!response.ok || !points) {
+        // HTTP 200 + status "unavailable" is an upstream miss, not an empty window.
+        if (
+          !response.ok ||
+          !points ||
+          (points.length === 0 && status === "unavailable")
+        ) {
           if (typeof payload?.error === "string") setRangeError(payload.error);
           if (hasThisRange && dataRef.current.length > 0) {
             setQuoteStatus("stale");

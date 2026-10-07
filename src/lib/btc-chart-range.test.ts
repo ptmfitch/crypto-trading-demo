@@ -26,10 +26,15 @@ describe("parseIsoDate", () => {
 });
 
 describe("parseChartRange", () => {
-  it("keeps an inclusive window and clamps a future end date", () => {
+  it("keeps an inclusive window and clamps future dates to today", () => {
     assert.deepEqual(parseChartRange("2026-09-24", "2026-10-20", TODAY), {
       ok: true,
       from: "2026-09-24",
+      to: TODAY,
+    });
+    assert.deepEqual(parseChartRange("2026-10-08", "2026-10-08", TODAY), {
+      ok: true,
+      from: TODAY,
       to: TODAY,
     });
   });
@@ -47,7 +52,7 @@ describe("parseChartRange", () => {
     });
   });
 
-  it("rejects an inverted window, a future start, and a span past 365 days", () => {
+  it("rejects an inverted window and a span past 365 days", () => {
     assert.equal(
       parseChartRange("2026-10-05", "2026-10-01", TODAY).ok,
       false
@@ -55,10 +60,6 @@ describe("parseChartRange", () => {
     assert.equal(
       parseChartRange("2026-10-05", "2026-10-01", TODAY).error,
       "The start date must be on or before the end date."
-    );
-    assert.equal(
-      parseChartRange("2026-10-08", "2026-10-09", TODAY).error,
-      "The start date cannot be in the future."
     );
     assert.equal(
       parseChartRange("2025-10-06", TODAY, TODAY).error,

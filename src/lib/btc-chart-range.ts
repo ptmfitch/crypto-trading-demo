@@ -26,7 +26,8 @@ export type ChartRange =
   | { ok: true; from: string; to: string }
   | { ok: false; error: string };
 
-// `today` is a UTC calendar day. A future end date is clamped to today.
+// `today` is a UTC calendar day. Future start and end dates are clamped to
+// today — the date picker can offer a local day that is still tomorrow in UTC.
 // The span cap matches the longest preset so a custom window stays demo-sized.
 export function parseChartRange(
   fromRaw: string | null,
@@ -39,24 +40,22 @@ export function parseChartRange(
   if (!from || !to || !today) {
     return { ok: false, error: "Use dates in YYYY-MM-DD format." };
   }
-  if (from > today) {
-    return { ok: false, error: "The start date cannot be in the future." };
-  }
   if (from > to) {
     return {
       ok: false,
       error: "The start date must be on or before the end date.",
     };
   }
+  const start = from > today ? today : from;
   const end = to > today ? today : to;
   const spanDays = Math.round(
-    (Date.parse(`${end}T00:00:00.000Z`) - Date.parse(`${from}T00:00:00.000Z`)) /
+    (Date.parse(`${end}T00:00:00.000Z`) - Date.parse(`${start}T00:00:00.000Z`)) /
       86_400_000
   );
   if (spanDays > MAX_CHART_SPAN_DAYS) {
     return { ok: false, error: "Choose a range of 365 days or less." };
   }
-  return { ok: true, from, to: end };
+  return { ok: true, from: start, to: end };
 }
 
 export function filterChartPoints(

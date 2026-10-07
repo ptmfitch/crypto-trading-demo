@@ -58,7 +58,7 @@ export function WalletSummary({
   // if (isLoading) {
   //   return (
   //       <Card>
-  //           <CardHeader><CardTitle>{t.summaryTitle}</CardTitle></CardHeader>
+  //           <CardHeader><CardTitle>{t.walletSummary}</CardTitle></CardHeader>
   //           <CardContent className="space-y-4">
   //               <Skeleton className="h-4 w-[150px]" />
   //               <Skeleton className="h-4 w-[200px]" />
@@ -72,7 +72,7 @@ export function WalletSummary({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t.summaryTitle}</CardTitle>
+        <CardTitle>{t.walletSummary}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex justify-between items-center">

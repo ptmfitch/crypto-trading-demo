@@ -84,6 +84,7 @@ function rangeLabel(
 export function BtcPriceChart() {
   const { locale, messages } = useMessages();
   const t = messages.chart;
+  const d = messages.dashboard;
   const dateLocale = locale === "sv" ? "sv-SE" : "en-US";
 
   const [data, setData] = React.useState<ChartDataPoint[]>([]);
@@ -180,12 +181,12 @@ export function BtcPriceChart() {
     : "hsl(var(--chart-negative))";
   const fillColorId = isPositiveChange ? "fillPositive" : "fillNegative";
   const showSkeleton = isLoading && loadedRange !== timeRange;
-  const delayLabel = translateDelayCode(quoteDelayLabel(quoteStatus), t);
+  const delayLabel = translateDelayCode(quoteDelayLabel(quoteStatus), d);
 
   const changeDescription =
     data.length === 0
       ? t.chartUnavailable
-      : (isPositiveChange ? t.increased : t.decreased)
+      : (isPositiveChange ? t.increasedBy : t.decreasedBy)
           .replace("{amount}", `$${priceChange.value.toFixed(2)}`)
           .replace("{percent}", priceChange.percent.toFixed(2));
 
@@ -202,7 +203,7 @@ export function BtcPriceChart() {
         <Select value={timeRange} onValueChange={setTimeRange}>
           <SelectTrigger
             className="w-[160px] rounded-lg sm:ml-auto"
-            aria-label={t.selectAValue}
+            aria-label={t.selectValue}
           >
             <SelectValue placeholder={t.selectTimeRange} />
           </SelectTrigger>

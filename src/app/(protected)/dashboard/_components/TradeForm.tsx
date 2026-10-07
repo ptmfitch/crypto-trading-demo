@@ -26,11 +26,11 @@ interface TradeFormProps {
   btcBalance: number;
 }
 
-function createFormSchema(messages: { amountMustBeGreaterThanZero: string }) {
+function createFormSchema(messages: { amountGreaterThanZero: string }) {
   return z.object({
     amount: z.coerce
       .number()
-      .positive({ message: messages.amountMustBeGreaterThanZero }),
+      .positive({ message: messages.amountGreaterThanZero }),
   });
 }
 
@@ -71,6 +71,7 @@ export function TradeForm({
 }: TradeFormProps) {
   const { messages } = useMessages();
   const t = messages.trade;
+  const d = messages.dashboard;
 
   const formSchema = useMemo(() => createFormSchema(t), [t]);
 
@@ -142,7 +143,7 @@ export function TradeForm({
     return () => clearInterval(interval);
   }, []);
 
-  const delayLabel = translateDelayCode(quoteDelayLabel(quoteStatus), t);
+  const delayLabel = translateDelayCode(quoteDelayLabel(quoteStatus), d);
   const quoteReady = quoteStatus === "fresh" && btcPrice != null && btcPrice > 0;
   const priceText =
     btcPrice == null
@@ -269,7 +270,7 @@ export function TradeForm({
           </Button>
           {delayLabel ? (
             <p className="text-xs text-center text-muted-foreground">
-              {t.pausedUntilLiveQuote}
+              {t.pausedUntilQuote}
             </p>
           ) : null}
         </form>

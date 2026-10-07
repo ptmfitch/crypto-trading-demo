@@ -101,9 +101,9 @@ export default async function DashboardPage() {
       <main className="flex-1 bg-muted/40">
         <div className="container mx-auto py-8 text-center">
           <h2 className="text-xl font-semibold text-destructive">
-            {t.couldNotLoad}
+            {t.loadErrorTitle}
           </h2>
-          <p className="text-muted-foreground">{t.couldNotLoadDescription}</p>
+          <p className="text-muted-foreground">{t.loadErrorDescription}</p>
         </div>
       </main>
     );
@@ -128,7 +128,7 @@ export default async function DashboardPage() {
       <div className="container mx-auto py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold">{welcomeTitle}</h1>
-          <p className="text-muted-foreground">{t.overviewDescription}</p>
+          <p className="text-muted-foreground">{t.overview}</p>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-6">

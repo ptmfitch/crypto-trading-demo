@@ -1,6 +1,6 @@
 "use client";
 
-import { registerUser } from "@/actions/auth";
+import { registerUser, type RegisterErrorCode } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -12,22 +12,33 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import type { Messages } from "@/i18n/en";
+import { useMessages } from "@/i18n/locale-provider";
+import { createRegisterSchema } from "@/i18n/schemas";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useMemo, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-const formSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters."),
-  email: z.string().email(),
-  password: z.string().min(6, "Password must be at least 6 characters."),
-});
+function registerErrorMessage(
+  code: RegisterErrorCode,
+  messages: Messages
+): string {
+  const map: Record<RegisterErrorCode, string> = {
+    invalidFields: messages.auth.invalidFields,
+    emailTaken: messages.auth.emailTaken,
+    somethingWentWrong: messages.auth.somethingWentWrong,
+  };
+  return map[code];
+}
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { messages } = useMessages();
+  const formSchema = useMemo(() => createRegisterSchema(messages), [messages]);
   const [isPending, startTransition] = useTransition();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -39,13 +50,13 @@ export default function RegisterPage() {
     startTransition(async () => {
       const result = await registerUser(values);
       if (result.success) {
-        toast.success("Account Created", {
-          description: "You can now log in with your credentials.",
+        toast.success(messages.auth.accountCreated, {
+          description: messages.auth.accountCreatedDescription,
         });
         router.push("/login");
-      } else {
-        toast.error("Registration Failed", {
-          description: result.error,
+      } else if (result.error) {
+        toast.error(messages.auth.registrationFailed, {
+          description: registerErrorMessage(result.error, messages),
         });
       }
     });
@@ -55,7 +66,7 @@ export default function RegisterPage() {
     <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-zinc-950">
       <Card className="w-[400px]">
         <CardHeader>
-          <CardTitle>Create an Account</CardTitle>
+          <CardTitle>{messages.auth.createAccountTitle}</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -65,9 +76,12 @@ export default function RegisterPage() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Name</FormLabel>
+                    <FormLabel>{messages.auth.name}</FormLabel>
                     <FormControl>
-                      <Input placeholder="John Doe" {...field} />
+                      <Input
+                        placeholder={messages.auth.namePlaceholder}
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -78,7 +92,7 @@ export default function RegisterPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{messages.auth.email}</FormLabel>
                     <FormControl>
                       <Input
                         type="email"
@@ -95,7 +109,7 @@ export default function RegisterPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>{messages.auth.password}</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
@@ -108,17 +122,19 @@ export default function RegisterPage() {
                 )}
               />
               <Button type="submit" className="w-full" disabled={isPending}>
-                {isPending ? "Registering..." : "Create Account"}
+                {isPending
+                  ? messages.auth.registering
+                  : messages.shell.createAccount}
               </Button>
             </form>
           </Form>
           <p className="mt-4 text-center text-sm text-gray-600">
-            Already have an account?{" "}
+            {messages.auth.alreadyHaveAccount}{" "}
             <Link
               href="/login"
               className="font-semibold text-primary hover:underline"
             >
-              Login
+              {messages.shell.login}
             </Link>
           </p>
         </CardContent>

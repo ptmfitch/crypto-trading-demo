@@ -1,9 +1,10 @@
 import { auth, signOut } from "@/auth";
+import { getTranslations } from "next-intl/server";
 import Link from "next/link";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { Button } from "./ui/button";
 
-function SignOutButton() {
+function SignOutButton({ label }: { label: string }) {
   return (
     <form
       action={async () => {
@@ -12,7 +13,7 @@ function SignOutButton() {
       }}
     >
       <Button type="submit" variant="ghost">
-        Logout
+        {label}
       </Button>
     </form>
   );
@@ -20,6 +21,7 @@ function SignOutButton() {
 
 export async function Header() {
   const session = await auth();
+  const t = await getTranslations("Header");
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -32,13 +34,13 @@ export async function Header() {
             href="/dashboard"
             className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
           >
-            Dashboard
+            {t("dashboard")}
           </Link>
           <Link
             href="/profile"
             className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
           >
-            Profile
+            {t("profile")}
           </Link>
         </div>
         <div className="flex items-center space-x-4">
@@ -46,7 +48,7 @@ export async function Header() {
             {session?.user?.name || session?.user?.email}
           </span>
           <ThemeSwitcher />
-          <SignOutButton />
+          <SignOutButton label={t("logout")} />
         </div>
       </nav>
     </header>

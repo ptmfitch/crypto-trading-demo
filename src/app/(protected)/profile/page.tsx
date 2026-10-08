@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { StatCard } from "@/components/StatCard";
+import { DEFAULT_LOCALE, isAppLocale } from "@/lib/locale";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -17,8 +18,10 @@ import {
 } from "@/lib/trade-history";
 import { Trade } from "@prisma/client";
 import { TrendingDown, TrendingUp } from "lucide-react";
+import { getLocale, getTranslations } from "next-intl/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { LanguagePicker } from "./_components/LanguagePicker";
 import {
   PnlDataPoint,
   PortfolioPnlChart,
@@ -71,6 +74,9 @@ function calculateAdvancedStats(trades: Trade[], pnlData: PnlDataPoint[]) {
 }
 
 export default async function ProfilePage() {
+  const t = await getTranslations("Profile");
+  const requestedLocale = await getLocale();
+  const locale = isAppLocale(requestedLocale) ? requestedLocale : DEFAULT_LOCALE;
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
@@ -91,11 +97,12 @@ export default async function ProfilePage() {
   return (
     <main className="flex-1 bg-muted/40">
       <div className="container mx-auto py-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">Performance Report</h1>
-          <p className="text-muted-foreground">
-            A detailed look at your trading history and performance.
-          </p>
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">{t("title")}</h1>
+            <p className="text-muted-foreground">{t("subtitle")}</p>
+          </div>
+          <LanguagePicker locale={locale} />
         </div>
 
         <div className="grid gap-8 lg:grid-cols-3">
@@ -105,39 +112,37 @@ export default async function ProfilePage() {
             ) : (
               <Card>
                 <CardHeader>
-                  <CardTitle>Performance Chart</CardTitle>
+                  <CardTitle>{t("chartTitle")}</CardTitle>
                 </CardHeader>
                 <CardContent className="flex items-center justify-center h-[250px]">
-                  <p className="text-muted-foreground">
-                    Make at least two trades to see your performance chart.
-                  </p>
+                  <p className="text-muted-foreground">{t("chartEmpty")}</p>
                 </CardContent>
               </Card>
             )}
           </div>
           <div className="lg:col-span-1 space-y-6">
             <StatCard
-              title="Lifetime P&L"
+              title={t("lifetimePnl")}
               value={`$${finalPnl.toLocaleString()}`}
               icon={finalPnl >= 0 ? TrendingUp : TrendingDown}
               color={pnlColor}
             />
             <Card>
               <CardHeader>
-                <CardTitle>Key Metrics</CardTitle>
+                <CardTitle>{t("metrics")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Win Rate</span>{" "}
+                  <span className="text-muted-foreground">{t("winRate")}</span>{" "}
                   <span className="font-semibold">{winRate.toFixed(1)}%</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Total Trades</span>{" "}
+                  <span className="text-muted-foreground">{t("totalTrades")}</span>{" "}
                   <span className="font-semibold">{trades.length}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground text-green-500">
-                    Best Trade
+                    {t("bestTrade")}
                   </span>{" "}
                   <span className="font-semibold text-green-500">
                     +${bestTradePnl.toFixed(2)}
@@ -145,7 +150,7 @@ export default async function ProfilePage() {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground text-red-500">
-                    Worst Trade
+                    {t("worstTrade")}
                   </span>{" "}
                   <span className="font-semibold text-red-500">
                     -${Math.abs(worstTradePnl).toFixed(2)}
@@ -157,16 +162,16 @@ export default async function ProfilePage() {
         </div>
 
         <div className="mt-8">
-          <h2 className="text-2xl font-bold mb-4">Trade History</h2>
+          <h2 className="text-2xl font-bold mb-4">{t("history")}</h2>
           <div className="border rounded-lg">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Price (USD)</TableHead>
-                  <TableHead>Amount (BTC)</TableHead>
-                  <TableHead className="text-right">Total (USD)</TableHead>
+                  <TableHead>{t("date")}</TableHead>
+                  <TableHead>{t("type")}</TableHead>
+                  <TableHead>{t("price")}</TableHead>
+                  <TableHead>{t("amount")}</TableHead>
+                  <TableHead className="text-right">{t("total")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -174,16 +179,15 @@ export default async function ProfilePage() {
                   <TableRow>
                     <TableCell colSpan={5} className="h-32">
                       <div className="flex flex-col items-center justify-center gap-2 text-center">
-                        <p className="font-medium">No trades yet</p>
+                        <p className="font-medium">{t("emptyTitle")}</p>
                         <p className="text-sm text-muted-foreground">
-                          Your buy and sell history will appear here after your
-                          first order.
+                          {t("emptyBody")}
                         </p>
                         <Link
                           href="/dashboard"
                           className="text-sm font-medium text-primary hover:underline"
                         >
-                          Place your first trade
+                          {t("emptyLink")}
                         </Link>
                       </div>
                     </TableCell>
@@ -191,14 +195,16 @@ export default async function ProfilePage() {
                 ) : (
                   [...trades].reverse().map((trade) => (
                     <TableRow key={trade.id}>
-                      <TableCell>{trade.timestamp.toLocaleString()}</TableCell>
+                      <TableCell>
+                        {trade.timestamp.toLocaleString(locale)}
+                      </TableCell>
                       <TableCell>
                         <Badge
                           variant={
                             trade.type === "BUY" ? "default" : "destructive"
                           }
                         >
-                          {trade.type}
+                          {trade.type === "BUY" ? t("buy") : t("sell")}
                         </Badge>
                       </TableCell>
                       <TableCell>

@@ -21,10 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  quoteDelayLabel,
-  type BtcQuoteStatus,
-} from "@/lib/btc-quote";
+import { type BtcQuoteStatus } from "@/lib/btc-quote";
+import { useLocale, useTranslations } from "next-intl";
 import * as React from "react";
 import {
   Area,
@@ -37,13 +35,6 @@ import {
 
 type ChartDataPoint = { date: string; price: number };
 
-const timeRangeOptions = [
-  { label: "Last 7 Days", value: "7" },
-  { label: "Last 30 Days", value: "30" },
-  { label: "Last 3 Months", value: "90" },
-  { label: "Last Year", value: "365" },
-];
-
 function chartStatus(value: unknown): BtcQuoteStatus | null {
   if (value === "fresh" || value === "stale" || value === "unavailable") {
     return value;
@@ -52,6 +43,15 @@ function chartStatus(value: unknown): BtcQuoteStatus | null {
 }
 
 export function BtcPriceChart() {
+  const t = useTranslations("Chart");
+  const quoteCopy = useTranslations("Quote");
+  const locale = useLocale();
+  const timeRangeOptions = [
+    { label: t("range7"), value: "7" },
+    { label: t("range30"), value: "30" },
+    { label: t("range90"), value: "90" },
+    { label: t("range365"), value: "365" },
+  ];
   const [data, setData] = React.useState<ChartDataPoint[]>([]);
   const [loadedRange, setLoadedRange] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -146,28 +146,37 @@ export function BtcPriceChart() {
     : "hsl(var(--chart-negative))";
   const fillColorId = isPositiveChange ? "fillPositive" : "fillNegative";
   const showSkeleton = isLoading && loadedRange !== timeRange;
-  const delayLabel = quoteDelayLabel(quoteStatus);
+  const delayLabel =
+    quoteStatus === "stale"
+      ? quoteCopy("delayed")
+      : quoteStatus === "unavailable"
+        ? quoteCopy("unavailable")
+        : null;
 
   return (
     <Card>
       <CardHeader className="flex flex-col items-start gap-4 space-y-0 border-b py-5 sm:flex-row sm:items-center sm:gap-6">
         <div className="grid flex-1 gap-1">
           <CardTitle className="flex items-center gap-2">
-            Bitcoin Price
+            {t("title")}
             {delayLabel ? <Badge variant="outline">{delayLabel}</Badge> : null}
           </CardTitle>
           <CardDescription>
             {data.length === 0
-              ? "Chart unavailable"
-              : `${isPositiveChange ? "Increased" : "Decreased"} by $${priceChange.value.toFixed(2)} (${priceChange.percent.toFixed(2)}%)`}
+              ? t("unavailable")
+              : t("change", {
+                  direction: t(isPositiveChange ? "increased" : "decreased"),
+                  amount: priceChange.value.toFixed(2),
+                  percent: priceChange.percent.toFixed(2),
+                })}
           </CardDescription>
         </div>
         <Select value={timeRange} onValueChange={setTimeRange}>
           <SelectTrigger
             className="w-[160px] rounded-lg sm:ml-auto"
-            aria-label="Select a value"
+            aria-label={t("selectValue")}
           >
-            <SelectValue placeholder="Select time range" />
+            <SelectValue placeholder={t("selectRange")} />
           </SelectTrigger>
           <SelectContent className="rounded-xl">
             {timeRangeOptions.map(({ label, value }) => (
@@ -183,7 +192,7 @@ export function BtcPriceChart() {
           <Skeleton className="h-[250px] w-full" />
         ) : data.length === 0 ? (
           <div className="flex h-[250px] items-center justify-center text-sm text-muted-foreground">
-            Chart unavailable
+            {t("unavailable")}
           </div>
         ) : (
           <ChartContainer config={{}} className="aspect-auto h-[250px] w-full">
@@ -224,7 +233,7 @@ export function BtcPriceChart() {
                 axisLine={false}
                 tickMargin={8}
                 tickFormatter={(value) =>
-                  new Date(value).toLocaleDateString("en-US", {
+                  new Date(value).toLocaleDateString(locale, {
                     month: "short",
                     day: "numeric",
                   })

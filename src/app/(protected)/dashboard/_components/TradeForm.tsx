@@ -6,22 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  quoteDelayLabel,
-  type BtcQuoteStatus,
-} from "@/lib/btc-quote";
+import { type BtcQuoteStatus } from "@/lib/btc-quote";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useTranslations } from "next-intl";
 import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-
-const formSchema = z.object({
-  amount: z.coerce
-    .number()
-    .positive({ message: "Amount must be greater than 0" }),
-});
 
 interface TradeFormProps {
   initialBtcPrice: number | null;
@@ -40,6 +32,11 @@ export function TradeForm({
   usdtBalance,
   btcBalance,
 }: TradeFormProps) {
+  const t = useTranslations("Trade");
+  const quoteCopy = useTranslations("Quote");
+  const formSchema = z.object({
+    amount: z.coerce.number().positive({ message: t("amountPositive") }),
+  });
   const [btcPrice, setBtcPrice] = useState<number | null>(initialBtcPrice);
   const [quoteStatus, setQuoteStatus] = useState<BtcQuoteStatus>(
     initialQuoteStatus
@@ -114,7 +111,12 @@ export function TradeForm({
     return () => clearInterval(interval);
   }, []);
 
-  const delayLabel = quoteDelayLabel(quoteStatus);
+  const delayLabel =
+    quoteStatus === "stale"
+      ? quoteCopy("delayed")
+      : quoteStatus === "unavailable"
+        ? quoteCopy("unavailable")
+        : null;
   const quoteReady = quoteStatus === "fresh" && btcPrice != null && btcPrice > 0;
   const priceText =
     btcPrice == null
@@ -126,7 +128,7 @@ export function TradeForm({
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     if (!quoteReady) {
-      toast.error("Trading is paused until a live BTC quote returns.");
+      toast.error(t("paused"));
       return;
     }
     startTransition(async () => {
@@ -154,8 +156,8 @@ export function TradeForm({
           className="w-full"
         >
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="BUY">Buy</TabsTrigger>
-            <TabsTrigger value="SELL">Sell</TabsTrigger>
+            <TabsTrigger value="BUY">{t("buy")}</TabsTrigger>
+            <TabsTrigger value="SELL">{t("sell")}</TabsTrigger>
           </TabsList>
         </Tabs>
       </CardHeader>
@@ -176,7 +178,7 @@ export function TradeForm({
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           {/* --- SPEND INPUT --- */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">You Pay</label>
+            <label className="text-sm font-medium">{t("youPay")}</label>
             <div className="relative">
               <Input
                 type="number"
@@ -191,8 +193,10 @@ export function TradeForm({
             </div>
             <div className="flex justify-between items-center">
               <span className="text-xs text-muted-foreground">
-                Available: {spendBalance.toFixed(spendAsset === "USDT" ? 2 : 6)}{" "}
-                {spendAsset}
+                {t("available", {
+                  amount: spendBalance.toFixed(spendAsset === "USDT" ? 2 : 6),
+                  asset: spendAsset,
+                })}
               </span>
               <div className="space-x-1">
                 {[25, 50, 100].map((p) => (
@@ -212,7 +216,7 @@ export function TradeForm({
 
           {/* --- RECEIVE DISPLAY --- */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">You Receive</label>
+            <label className="text-sm font-medium">{t("youReceive")}</label>
             <div className="relative">
               <Input
                 readOnly
@@ -230,11 +234,15 @@ export function TradeForm({
             className="w-full"
             disabled={isPending || !quoteReady}
           >
-            {isPending ? "Processing..." : `${tradeType} BTC`}
+            {isPending
+              ? t("processing")
+              : tradeType === "BUY"
+                ? t("buySubmit")
+                : t("sellSubmit")}
           </Button>
           {delayLabel ? (
             <p className="text-xs text-center text-muted-foreground">
-              Buying and selling stay paused until a live quote returns.
+              {t("pausedHint")}
             </p>
           ) : null}
         </form>

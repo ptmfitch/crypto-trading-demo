@@ -5,6 +5,7 @@ import { assertTradableQuote } from "@/lib/btc-quote";
 import { getBtcQuote } from "@/lib/btc-market";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -15,29 +16,30 @@ const TradeSchema = z.object({
 });
 
 export async function executeTrade(values: z.infer<typeof TradeSchema>) {
+  const t = await getTranslations("Trade");
   const session = await auth();
   if (!session?.user?.id) {
-    return { error: "Not authenticated" };
+    return { error: t("notAuthenticated") };
   }
   const userId = session.user.id;
 
   const validatedFields = TradeSchema.safeParse(values);
   if (!validatedFields.success) {
-    return { error: "Invalid input" };
+    return { error: t("invalidInput") };
   }
 
   const { amount, tradeType, asset } = validatedFields.data;
 
   const tradable = assertTradableQuote(await getBtcQuote());
   if (!tradable.ok) {
-    return { error: tradable.error };
+    return { error: t("paused") };
   }
   const liveBtcPrice = new Prisma.Decimal(tradable.usd);
 
   try {
     const result = await prisma.$transaction(async (tx) => {
       const wallet = await tx.wallet.findUnique({ where: { userId } });
-      if (!wallet) throw new Error("Wallet not found.");
+      if (!wallet) throw new Error("walletMissing");
 
       let usdtAmount: Prisma.Decimal;
       let btcAmount: Prisma.Decimal;
@@ -52,7 +54,7 @@ export async function executeTrade(values: z.infer<typeof TradeSchema>) {
 
       if (tradeType === "BUY") {
         if (wallet.usdtBalance.lt(usdtAmount))
-          throw new Error("Insufficient USDT balance.");
+          throw new Error("insufficientUsdt");
         await tx.wallet.update({
           where: { userId },
           data: {
@@ -62,7 +64,7 @@ export async function executeTrade(values: z.infer<typeof TradeSchema>) {
         });
       } else {
         if (wallet.btcBalance.lt(btcAmount))
-          throw new Error("Insufficient BTC balance.");
+          throw new Error("insufficientBtc");
         await tx.wallet.update({
           where: { userId },
           data: {
@@ -86,20 +88,25 @@ export async function executeTrade(values: z.infer<typeof TradeSchema>) {
       const usdtDisplay = usdtAmount.toDP(2);
 
       return {
-        message: `Successfully ${
-          tradeType === "BUY" ? "bought" : "sold"
-        } ${btcDisplay} BTC for $${usdtDisplay}`,
+        btc: btcDisplay.toString(),
+        usdt: usdtDisplay.toString(),
       };
     });
 
     revalidatePath("/dashboard");
     revalidatePath("/profile");
-    return { success: result.message };
+    return {
+      success: t(tradeType === "BUY" ? "bought" : "sold", result),
+    };
   } catch (error) {
-    let message = "Trade failed.";
-    if (error instanceof Error && error.message) {
-      message = error.message;
+    const code = error instanceof Error ? error.message : "";
+    if (
+      code === "walletMissing" ||
+      code === "insufficientUsdt" ||
+      code === "insufficientBtc"
+    ) {
+      return { error: t(code) };
     }
-    return { error: message };
+    return { error: t("failed") };
   }
 }

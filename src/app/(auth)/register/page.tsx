@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
@@ -20,15 +21,16 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-const formSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters."),
-  email: z.string().email(),
-  password: z.string().min(6, "Password must be at least 6 characters."),
-});
-
 export default function RegisterPage() {
+  const t = useTranslations("Register");
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
+  const formSchema = z.object({
+    name: z.string().min(2, t("nameMin")),
+    email: z.string().email(t("emailInvalid")),
+    password: z.string().min(6, t("passwordMin")),
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -39,12 +41,12 @@ export default function RegisterPage() {
     startTransition(async () => {
       const result = await registerUser(values);
       if (result.success) {
-        toast.success("Account Created", {
-          description: "You can now log in with your credentials.",
+        toast.success(t("created"), {
+          description: t("createdDescription"),
         });
         router.push("/login");
       } else {
-        toast.error("Registration Failed", {
+        toast.error(t("failed"), {
           description: result.error,
         });
       }
@@ -55,7 +57,7 @@ export default function RegisterPage() {
     <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-zinc-950">
       <Card className="w-[400px]">
         <CardHeader>
-          <CardTitle>Create an Account</CardTitle>
+          <CardTitle>{t("title")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -65,7 +67,7 @@ export default function RegisterPage() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Name</FormLabel>
+                    <FormLabel>{t("name")}</FormLabel>
                     <FormControl>
                       <Input placeholder="John Doe" {...field} />
                     </FormControl>
@@ -78,7 +80,7 @@ export default function RegisterPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t("email")}</FormLabel>
                     <FormControl>
                       <Input
                         type="email"
@@ -95,7 +97,7 @@ export default function RegisterPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>{t("password")}</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
@@ -108,17 +110,17 @@ export default function RegisterPage() {
                 )}
               />
               <Button type="submit" className="w-full" disabled={isPending}>
-                {isPending ? "Registering..." : "Create Account"}
+                {isPending ? t("pending") : t("submit")}
               </Button>
             </form>
           </Form>
           <p className="mt-4 text-center text-sm text-gray-600">
-            Already have an account?{" "}
+            {t("hasAccount")}{" "}
             <Link
               href="/login"
               className="font-semibold text-primary hover:underline"
             >
-              Login
+              {t("login")}
             </Link>
           </p>
         </CardContent>

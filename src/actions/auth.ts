@@ -3,19 +3,21 @@
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { getTranslations } from "next-intl/server";
 import { z } from "zod";
 
 const RegisterSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  name: z.string().min(2),
+  email: z.string().email(),
+  password: z.string().min(6),
 });
 
 export async function registerUser(values: z.infer<typeof RegisterSchema>) {
+  const t = await getTranslations("Register");
   const validatedFields = RegisterSchema.safeParse(values);
 
   if (!validatedFields.success) {
-    return { error: "Invalid fields!" };
+    return { error: t("invalidFields") };
   }
 
   const { name, email, password } = validatedFields.data;
@@ -38,13 +40,13 @@ export async function registerUser(values: z.infer<typeof RegisterSchema>) {
       });
     });
 
-    return { success: "User created successfully! Please log in." };
+    return { success: t("createdServer") };
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2002") {
-        return { error: "An account with this email already exists." };
+        return { error: t("emailTaken") };
       }
     }
-    return { error: "Something went wrong." };
+    return { error: t("genericError") };
   }
 }

@@ -20,9 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { TestAccount } from "@/lib/dev-login";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -30,22 +30,29 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-const formSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1, "Password is required"),
-});
+type LoginAccount = {
+  email: string;
+  name: string;
+  summary: string;
+};
 
 export default function LoginForm({
   devLoginEnabled,
   testAccounts,
 }: {
   devLoginEnabled: boolean;
-  testAccounts: TestAccount[];
+  testAccounts: LoginAccount[];
 }) {
+  const t = useTranslations("Login");
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isDevPending, startDevTransition] = useTransition();
   const [selectedEmail, setSelectedEmail] = useState<string>("");
+
+  const formSchema = z.object({
+    email: z.string().email(t("emailInvalid")),
+    password: z.string().min(1, t("passwordRequired")),
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -65,11 +72,11 @@ export default function LoginForm({
       });
 
       if (result?.error) {
-        toast.error("Login Failed", {
-          description: "Please check your email and password.",
+        toast.error(t("failed"), {
+          description: t("failedDescription"),
         });
       } else {
-        toast.success("Login Successful!");
+        toast.success(t("success"));
         router.push("/dashboard");
         router.refresh();
       }
@@ -82,7 +89,7 @@ export default function LoginForm({
     startDevTransition(async () => {
       const result = await signInAsTestAccount(selectedEmail);
       if (result?.error) {
-        toast.error("Login Failed", { description: result.error });
+        toast.error(t("failed"), { description: result.error });
       }
     });
   }
@@ -91,20 +98,20 @@ export default function LoginForm({
     <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-zinc-950">
       <Card className="w-[400px]">
         <CardHeader>
-          <CardTitle>Welcome Back</CardTitle>
+          <CardTitle>{t("title")}</CardTitle>
         </CardHeader>
         <CardContent>
           {devLoginEnabled ? (
             <div className="mb-6 space-y-3">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-medium">Test account</p>
-                <Badge variant="outline">Development</Badge>
+                <p className="text-sm font-medium">{t("testAccount")}</p>
+                <Badge variant="outline">{t("development")}</Badge>
               </div>
               {testAccounts.length > 0 ? (
                 <>
                   <Select value={selectedEmail} onValueChange={setSelectedEmail}>
-                    <SelectTrigger className="w-full" aria-label="Test account">
-                      <SelectValue placeholder="Choose an account" />
+                    <SelectTrigger className="w-full" aria-label={t("testAccount")}>
+                      <SelectValue placeholder={t("chooseAccount")} />
                     </SelectTrigger>
                     <SelectContent>
                       {testAccounts.map((account) => (
@@ -125,18 +132,18 @@ export default function LoginForm({
                     disabled={!selectedEmail || isDevPending}
                     onClick={onDevSignIn}
                   >
-                    {isDevPending ? "Signing in..." : "Continue as this account"}
+                    {isDevPending ? t("signingIn") : t("continueAs")}
                   </Button>
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  No test accounts are in the local database yet.
+                  {t("noTestAccounts")}
                 </p>
               )}
               <div className="flex items-center gap-3 pt-1">
                 <div className="h-px flex-1 bg-border" />
                 <span className="text-xs text-muted-foreground">
-                  or use email and password
+                  {t("orCredentials")}
                 </span>
                 <div className="h-px flex-1 bg-border" />
               </div>
@@ -149,7 +156,7 @@ export default function LoginForm({
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t("email")}</FormLabel>
                     <FormControl>
                       <Input
                         type="email"
@@ -166,7 +173,7 @@ export default function LoginForm({
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>{t("password")}</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
@@ -179,17 +186,17 @@ export default function LoginForm({
                 )}
               />
               <Button type="submit" className="w-full" disabled={isPending}>
-                {isPending ? "Logging in..." : "Login"}
+                {isPending ? t("pending") : t("submit")}
               </Button>
             </form>
           </Form>
           <p className="mt-4 text-center text-sm text-gray-600">
-            Don&apos;t have an account?{" "}
+            {t("noAccount")}{" "}
             <Link
               href="/register"
               className="font-semibold text-primary hover:underline"
             >
-              Register
+              {t("register")}
             </Link>
           </p>
         </CardContent>

@@ -2,8 +2,10 @@ import prisma from "./prisma";
 
 export type TestAccount = {
   email: string;
-  name: string;
-  summary: string;
+  name: string | null;
+  usdt: number;
+  btc: number;
+  trades: number;
 };
 
 export function isDevLoginEnabled() {
@@ -28,8 +30,11 @@ function formatBtc(value: { toString(): string } | null | undefined) {
   }).format(amount);
 }
 
-function tradeLabel(count: number) {
-  return count === 1 ? "1 trade" : `${count} trades`;
+export function formatTestAccountSummary(
+  account: Pick<TestAccount, "usdt" | "btc">,
+  labels: { cash: string; trades: string }
+) {
+  return `${formatUsd(account.usdt)} ${labels.cash} · ${formatBtc(account.btc)} BTC · ${labels.trades}`;
 }
 
 export async function listTestAccounts(): Promise<TestAccount[]> {
@@ -50,7 +55,9 @@ export async function listTestAccounts(): Promise<TestAccount[]> {
 
   return users.map((user) => ({
     email: user.email,
-    name: user.name?.trim() || "Unnamed account",
-    summary: `${formatUsd(user.wallet?.usdtBalance)} cash · ${formatBtc(user.wallet?.btcBalance)} BTC · ${tradeLabel(user._count.trades)}`,
+    name: user.name,
+    usdt: Number(user.wallet?.usdtBalance ?? 0),
+    btc: Number(user.wallet?.btcBalance ?? 0),
+    trades: user._count.trades,
   }));
 }

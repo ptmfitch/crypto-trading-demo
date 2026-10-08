@@ -13,6 +13,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { useLocale, useTranslations } from "next-intl";
 import {
   Area,
   AreaChart,
@@ -27,14 +28,15 @@ export type PnlDataPoint = {
   pnl: number;
 };
 
-const chartConfig = {
-  pnl: {
-    label: "P&L",
-    color: "hsl(var(--chart-1))",
-  },
-} satisfies ChartConfig;
-
 export function PortfolioPnlChart({ data }: { data: PnlDataPoint[] }) {
+  const t = useTranslations("Profile");
+  const locale = useLocale();
+  const chartConfig = {
+    pnl: {
+      label: t("pnlLabel"),
+      color: "hsl(var(--chart-1))",
+    },
+  } satisfies ChartConfig;
   const isLoss = data.length > 0 && data[data.length - 1].pnl < 0;
   // Conditionally set the colors based on performance
   const strokeColor = isLoss
@@ -45,10 +47,8 @@ export function PortfolioPnlChart({ data }: { data: PnlDataPoint[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Portfolio Performance</CardTitle>
-        <CardDescription>
-          Your portfolio&apos;s profit and loss over time.
-        </CardDescription>
+        <CardTitle>{t("performanceTitle")}</CardTitle>
+        <CardDescription>{t("performanceDescription")}</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer
@@ -95,7 +95,7 @@ export function PortfolioPnlChart({ data }: { data: PnlDataPoint[] }) {
               tick={{ fill: `hsl(var(--muted-foreground))` }}
               tickFormatter={(value) => {
                 const date = new Date(value);
-                return date.toLocaleDateString("en-US", {
+                return date.toLocaleDateString(locale, {
                   month: "short",
                   day: "numeric",
                 });
@@ -113,11 +113,11 @@ export function PortfolioPnlChart({ data }: { data: PnlDataPoint[] }) {
               content={
                 <ChartTooltipContent
                   labelFormatter={(label) =>
-                    new Date(label).toLocaleDateString()
+                    new Date(label).toLocaleDateString(locale)
                   }
                   formatter={(value) => [
-                    `$${Number(value).toLocaleString()}`,
-                    "P&L",
+                    `$${Number(value).toLocaleString(locale)}`,
+                    t("pnlLabel"),
                   ]}
                 />
               }

@@ -5,7 +5,7 @@ import { createTranslator } from "use-intl/core";
 
 import { TRADE_PAUSED_ERROR } from "./btc-quote.ts";
 
-const locales = ["en", "sv", "da"] as const;
+const locales = ["en", "sv", "da", "nb"] as const;
 
 function load(locale: (typeof locales)[number]) {
   const file = new URL(`../../messages/${locale}.json`, import.meta.url);
@@ -86,12 +86,15 @@ describe("message catalogs", () => {
     );
   });
 
-  it("uses distinct Swedish and Danish copy for the profile and header", () => {
+  it("uses distinct Nordic copy for the profile and header", () => {
     assert.equal(catalogs.sv.Profile.language, "Språk");
     assert.equal(catalogs.da.Profile.language, "Sprog");
+    assert.equal(catalogs.nb.Profile.language, "Språk");
     assert.notEqual(catalogs.sv.Header.logout, catalogs.en.Header.logout);
     assert.notEqual(catalogs.da.Header.logout, catalogs.sv.Header.logout);
+    assert.notEqual(catalogs.nb.Header.logout, catalogs.da.Header.logout);
     assert.equal(catalogs.sv.Profile.emptyTitle, "Inga affärer ännu");
     assert.equal(catalogs.da.Profile.emptyTitle, "Ingen handler endnu");
+    assert.equal(catalogs.nb.Profile.emptyTitle, "Ingen handler ennå");
   });
 });

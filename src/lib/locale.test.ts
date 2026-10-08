@@ -38,32 +38,36 @@ describe("user locale", () => {
     if (dir) rmSync(dir, { recursive: true, force: true });
   });
 
-  it("saves a locale and reads it back for that user", async () => {
-    const user = await prisma.user.create({
+  it("saves a locale and reads it back for that user only", async () => {
+    const swedish = await prisma.user.create({
+      data: { email: "sv@example.com", name: "Svea" },
+    });
+    const english = await prisma.user.create({
       data: { email: "en@example.com", name: "Ada" },
     });
 
-    assert.equal(await readUserLocale(prisma, user.id), "en");
-    assert.equal(await saveUserLocale(prisma, user.id, "en"), "en");
-    assert.equal(await readUserLocale(prisma, user.id), "en");
+    assert.equal(await readUserLocale(prisma, swedish.id), "en");
+    assert.equal(await saveUserLocale(prisma, swedish.id, "sv"), "sv");
+    assert.equal(await readUserLocale(prisma, swedish.id), "sv");
+    assert.equal(await readUserLocale(prisma, english.id), "en");
 
     const stored = await prisma.user.findUnique({
-      where: { id: user.id },
+      where: { id: swedish.id },
       select: { locale: true },
     });
-    assert.equal(stored?.locale, "en");
+    assert.equal(stored?.locale, "sv");
   });
 
   it("rejects an unsupported locale without changing the saved value", async () => {
     const user = await prisma.user.create({
-      data: { email: "keep@example.com", name: "Keep" },
+      data: { email: "keep@example.com", name: "Keep", locale: "sv" },
     });
 
     await assert.rejects(
-      () => saveUserLocale(prisma, user.id, "sv"),
+      () => saveUserLocale(prisma, user.id, "da"),
       UnsupportedLocaleError
     );
-    assert.equal(await readUserLocale(prisma, user.id), "en");
+    assert.equal(await readUserLocale(prisma, user.id), "sv");
   });
 
   it("falls back to English when the stored locale is not supported", async () => {

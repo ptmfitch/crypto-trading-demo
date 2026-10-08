@@ -1,13 +1,15 @@
 "use server";
 
 import { AuthError } from "next-auth";
+import { getTranslations } from "next-intl/server";
 import { signIn } from "@/auth";
 import { isDevLoginEnabled } from "@/lib/dev-login";
 import prisma from "@/lib/prisma";
 
 export async function signInAsTestAccount(email: string) {
+  const t = await getTranslations("Login");
   if (!isDevLoginEnabled()) {
-    return { error: "Development login is turned off." };
+    return { error: t("devOff") };
   }
 
   const account = await prisma.user.findUnique({
@@ -15,12 +17,12 @@ export async function signInAsTestAccount(email: string) {
     select: { email: true },
   });
   if (!account) {
-    return { error: "That test account is not in the local database." };
+    return { error: t("devMissing") };
   }
 
   const secret = process.env.AUTH_SECRET;
   if (!secret) {
-    return { error: "AUTH_SECRET is not set." };
+    return { error: t("devSecret") };
   }
 
   try {
@@ -31,7 +33,7 @@ export async function signInAsTestAccount(email: string) {
     });
   } catch (error) {
     if (error instanceof AuthError) {
-      return { error: "Could not sign in as that test account." };
+      return { error: t("devFailed") };
     }
     throw error;
   }

@@ -42,14 +42,15 @@ describe("user locale", () => {
     const swedish = await prisma.user.create({
       data: { email: "sv@example.com", name: "Svea" },
     });
-    const english = await prisma.user.create({
-      data: { email: "en@example.com", name: "Ada" },
+    const danish = await prisma.user.create({
+      data: { email: "da@example.com", name: "Dane" },
     });
 
     assert.equal(await readUserLocale(prisma, swedish.id), "en");
     assert.equal(await saveUserLocale(prisma, swedish.id, "sv"), "sv");
+    assert.equal(await saveUserLocale(prisma, danish.id, "da"), "da");
     assert.equal(await readUserLocale(prisma, swedish.id), "sv");
-    assert.equal(await readUserLocale(prisma, english.id), "en");
+    assert.equal(await readUserLocale(prisma, danish.id), "da");
 
     const stored = await prisma.user.findUnique({
       where: { id: swedish.id },
@@ -60,14 +61,14 @@ describe("user locale", () => {
 
   it("rejects an unsupported locale without changing the saved value", async () => {
     const user = await prisma.user.create({
-      data: { email: "keep@example.com", name: "Keep", locale: "sv" },
+      data: { email: "keep@example.com", name: "Keep", locale: "da" },
     });
 
     await assert.rejects(
-      () => saveUserLocale(prisma, user.id, "da"),
+      () => saveUserLocale(prisma, user.id, "nb"),
       UnsupportedLocaleError
     );
-    assert.equal(await readUserLocale(prisma, user.id), "sv");
+    assert.equal(await readUserLocale(prisma, user.id), "da");
   });
 
   it("falls back to English when the stored locale is not supported", async () => {

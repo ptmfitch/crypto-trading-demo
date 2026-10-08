@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { StatCard } from "@/components/StatCard";
+import { DEFAULT_LOCALE, isAppLocale } from "@/lib/locale";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -20,6 +21,7 @@ import { TrendingDown, TrendingUp } from "lucide-react";
 import { getLocale, getTranslations } from "next-intl/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { LanguagePicker } from "./_components/LanguagePicker";
 import {
   PnlDataPoint,
   PortfolioPnlChart,
@@ -73,7 +75,8 @@ function calculateAdvancedStats(trades: Trade[], pnlData: PnlDataPoint[]) {
 
 export default async function ProfilePage() {
   const t = await getTranslations("Profile");
-  const locale = await getLocale();
+  const requestedLocale = await getLocale();
+  const locale = isAppLocale(requestedLocale) ? requestedLocale : DEFAULT_LOCALE;
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
@@ -94,9 +97,12 @@ export default async function ProfilePage() {
   return (
     <main className="flex-1 bg-muted/40">
       <div className="container mx-auto py-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">{t("title")}</h1>
-          <p className="text-muted-foreground">{t("subtitle")}</p>
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">{t("title")}</h1>
+            <p className="text-muted-foreground">{t("subtitle")}</p>
+          </div>
+          <LanguagePicker locale={locale} />
         </div>
 
         <div className="grid gap-8 lg:grid-cols-3">

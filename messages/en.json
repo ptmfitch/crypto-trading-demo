@@ -144,6 +144,9 @@
     "performanceDescription": "Your portfolio''s profit and loss over time.",
     "pnlLabel": "P&L",
     "buy": "BUY",
-    "sell": "SELL"
+    "sell": "SELL",
+    "language": "Language",
+    "languageSaved": "Language saved",
+    "languageError": "Could not save language"
   }
 }

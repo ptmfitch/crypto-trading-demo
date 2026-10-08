@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 
-export const LOCALES = ["en"] as const;
+export const LOCALES = ["en", "sv"] as const;
 
 export type AppLocale = (typeof LOCALES)[number];
 
@@ -8,6 +8,7 @@ export const DEFAULT_LOCALE: AppLocale = "en";
 
 export const LOCALE_LABELS: Record<AppLocale, string> = {
   en: "English",
+  sv: "Svenska",
 };
 
 export function isAppLocale(value: unknown): value is AppLocale {

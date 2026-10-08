@@ -8,8 +8,9 @@ import {
 import prisma from "@/lib/prisma";
 import { getRequestConfig } from "next-intl/server";
 import en from "../../messages/en.json";
+import sv from "../../messages/sv.json";
 
-const catalogs = { en } satisfies Record<AppLocale, typeof en>;
+const catalogs = { en, sv } satisfies Record<AppLocale, typeof en>;
 
 // Guests stay on English. After login the user row wins, including when
 // the browser has no leftover cookies from the previous session.

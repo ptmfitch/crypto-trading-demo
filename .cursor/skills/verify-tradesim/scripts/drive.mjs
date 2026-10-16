@@ -215,6 +215,9 @@ const FIND_SCRIPT = `async (request) => {
     element.form.requestSubmit(element);
     return { action: "submit", name: accessibleName(element) };
   }
+  // Radix menus and tabs open or switch on pointerdown. A bare click never reaches them.
+  element.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+  element.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
   element.click();
   return { action: "click", name: accessibleName(element) };
 }`;

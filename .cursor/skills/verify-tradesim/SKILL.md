@@ -1,6 +1,6 @@
 ---
 name: verify-tradesim
-description: Drive the TradeSim crypto trading demo in a browser and prove registration, login, BTC buys, and the profile report. Use when changing this app's UI, auth, wallet, or trades.
+description: Drive the TradeSim crypto trading demo in a browser and prove registration, login, BTC buys, the Bitcoin price chart scale, and the profile report. Use when changing this app's UI, auth, wallet, trades, or charts.
 ---
 
 # Verify TradeSim
@@ -19,7 +19,7 @@ From the repo root:
 
 If 4173 is taken, pass another port other than 3000. The command creates `/tmp/tradesim-verify/run-<id>/`, runs `npx prisma db push` against `file:/tmp/tradesim-verify/run-<id>/dev.db`, and starts `npx next dev -p <port> -H 127.0.0.1` with a generated `AUTH_SECRET`, `DEV_LOGIN=true`, and `NEXT_PUBLIC_APP_URL` set to that origin.
 
-Ready means `curl -sf http://127.0.0.1:<port>` contains `Welcome to TradeSim`, and the command printed `URL=`, `PID=`, and `DATABASE=`. The server log is `/tmp/tradesim-verify/run-<id>/server.log`.
+Ready means `curl -sf http://127.0.0.1:<port>` contains `Welcome to TradeSim`, and the command printed `URL=`, `PID=`, and `DATABASE=`. The server log is `/tmp/tradesim-verify/run-<id>/server.log`. Launch runs the repo's `node_modules/.bin/prisma` and `node_modules/.bin/next` rather than `npx`, because `npx` on some agents fails before it can start Next.
 
 ## Doctor
 
@@ -64,6 +64,7 @@ Stable handles:
 - Register card text: `Create an Account`. Textboxes: `Name`, `Email`, `Password`. Submit button: `Create Account`. Alternate link: `Login`.
 - Login card text: `Welcome Back`. Textboxes: `Email`, `Password`. Submit button: `Login`. When `DEV_LOGIN=true`, combobox accessible name `Test account`, button `Continue as this account`.
 - Dashboard heading: `Welcome Back, <name>!`. Stat titles: `Portfolio Value`, `Total P&L`, `Live BTC Price`, `Total Trades`. Trade tabs: `Buy`, `Sell`. The trade card shows the BTC quote. Amount field: the number input under the visible label `You Pay` (placeholder `0.00`; the label is not wired to the input). Submit button: `BUY BTC` or `SELL BTC`. When the quote is delayed or missing, the card shows a `Price delayed` or `Price unavailable` chip, the quote text is muted, and the submit button is disabled. The pay field and percent buttons stay usable. A disabled control's accessibility snapshot ends with `disabled`.
+- Bitcoin Price chart: the plot is an image named `Bitcoin price from $…k to $…k` for a five- or six-figure USD series. Those figures are thousands of dollars (`$110.4k` is about $110,400). They line up with `Live BTC Price`. A label near `$1104.0k` for a ~$110,400 quote means the axis is still ten times too high.
 - Header links on protected pages: `TradeSim`, `Dashboard`, `Profile`, button `Logout`.
 - Profile heading: `Performance Report`. Section heading: `Trade History`.
 

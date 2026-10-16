@@ -165,7 +165,8 @@ EOF
 
   (
     cd "$REPO_ROOT"
-    npx prisma db push --skip-generate --accept-data-loss
+    # The environment npx can fail to load. The repo install already has Prisma.
+    "$REPO_ROOT/node_modules/.bin/prisma" db push --skip-generate --accept-data-loss
   ) >"$root/prisma.log" 2>&1
 
   # Double-fork into a new session so the dev server outlives this command.
@@ -206,7 +207,8 @@ os.dup2(log.fileno(), 1)
 os.dup2(log.fileno(), 2)
 devnull = open(os.devnull, "r", encoding="utf-8")
 os.dup2(devnull.fileno(), 0)
-os.execvpe("npx", ["npx", "next", "dev", "-p", port, "-H", "127.0.0.1"], env)
+next_bin = os.path.join(repo, "node_modules", ".bin", "next")
+os.execvpe(next_bin, ["next", "dev", "-p", port, "-H", "127.0.0.1"], env)
 PY
   )"
   echo "$launch_pid" >"$root/server.pid"

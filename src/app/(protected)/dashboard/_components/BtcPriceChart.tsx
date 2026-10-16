@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { btcAxisScale, btcDayTicks } from "@/lib/btc-axis";
 import {
   quoteDelayLabel,
   type BtcQuoteStatus,
@@ -112,11 +113,12 @@ export function BtcPriceChart() {
     };
   }, [timeRange]);
 
-  const { chartDomain, isPositiveChange, currentPrice, priceChange } =
+  const { axis, dayTicks, isPositiveChange, currentPrice, priceChange } =
     React.useMemo(() => {
       if (!data || data.length === 0) {
         return {
-          chartDomain: [0, 0],
+          axis: btcAxisScale([]),
+          dayTicks: [] as string[],
           isPositiveChange: true,
           currentPrice: 0,
           priceChange: { value: 0, percent: 0 },
@@ -124,17 +126,14 @@ export function BtcPriceChart() {
       }
 
       const prices = data.map((d) => d.price);
-      const minPrice = Math.min(...prices);
-      const maxPrice = Math.max(...prices);
-      const padding = (maxPrice - minPrice) * 0.05;
-
       const startPrice = prices[0];
       const endPrice = prices[prices.length - 1];
       const changeValue = endPrice - startPrice;
       const changePercent = (changeValue / startPrice) * 100;
 
       return {
-        chartDomain: [minPrice - padding, maxPrice + padding],
+        axis: btcAxisScale(prices),
+        dayTicks: btcDayTicks(data),
         isPositiveChange: endPrice >= startPrice,
         currentPrice: endPrice,
         priceChange: { value: changeValue, percent: changePercent },
@@ -147,6 +146,14 @@ export function BtcPriceChart() {
   const fillColorId = isPositiveChange ? "fillPositive" : "fillNegative";
   const showSkeleton = isLoading && loadedRange !== timeRange;
   const delayLabel = quoteDelayLabel(quoteStatus);
+  const axisEnds =
+    axis.ticks.length >= 2
+      ? [axis.ticks[0], axis.ticks[axis.ticks.length - 1]]
+      : axis.domain;
+  const axisLabel =
+    data.length === 0
+      ? "Bitcoin price chart unavailable"
+      : `Bitcoin price from ${axis.format(axisEnds[0])} to ${axis.format(axisEnds[1])}`;
 
   return (
     <Card>
@@ -159,7 +166,7 @@ export function BtcPriceChart() {
           <CardDescription>
             {data.length === 0
               ? "Chart unavailable"
-              : `${isPositiveChange ? "Increased" : "Decreased"} by $${priceChange.value.toFixed(2)} (${priceChange.percent.toFixed(2)}%)`}
+              : `${isPositiveChange ? "Increased" : "Decreased"} by $${Math.abs(priceChange.value).toFixed(2)} (${Math.abs(priceChange.percent).toFixed(2)}%)`}
           </CardDescription>
         </div>
         <Select value={timeRange} onValueChange={setTimeRange}>
@@ -186,7 +193,12 @@ export function BtcPriceChart() {
             Chart unavailable
           </div>
         ) : (
-          <ChartContainer config={{}} className="aspect-auto h-[250px] w-full">
+          <ChartContainer
+            config={{}}
+            className="aspect-auto h-[250px] w-full"
+            role="img"
+            aria-label={axisLabel}
+          >
             <AreaChart data={data}>
               <defs>
                 <linearGradient id="fillPositive" x1="0" y1="0" x2="0" y2="1">
@@ -220,6 +232,8 @@ export function BtcPriceChart() {
               />
               <XAxis
                 dataKey="date"
+                ticks={dayTicks}
+                interval={0}
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
@@ -231,13 +245,14 @@ export function BtcPriceChart() {
                 }
               />
               <YAxis
-                domain={chartDomain}
+                domain={axis.domain}
+                ticks={axis.ticks}
+                interval={0}
+                width="auto"
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
-                tickFormatter={(value) =>
-                  `$${(Number(value) / 100).toFixed(1)}k`
-                }
+                tickFormatter={axis.format}
               />
               <ChartTooltip
                 cursor={false}

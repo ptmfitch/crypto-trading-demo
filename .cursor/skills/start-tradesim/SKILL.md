@@ -9,12 +9,31 @@ Start the shared local demo. Port 3000 and `prisma/dev.db` belong to that demo. 
 
 SQLite is a file. There is no database server, Docker, or other process to start.
 
+## Uncommitted changes
+
+Start here, before pulling or starting anything.
+
+From the repo root, check for uncommitted changes (`git status` and `git diff`, including staged and untracked files).
+
+If the working tree is clean, continue.
+
+If it is not, stay in this turn:
+
+- Read the diff and summarize what changed: which files, and what the edits do. Do not print secrets.
+- Ask what to do with the AskQuestion tool in this same turn. Put that summary in the question prompt. Do not end the turn by writing the question as a message.
+- Offer these choices:
+  - Keep the changes and continue. Do not stash, reset, or commit. Continue with pull and startup. If the pull cannot fast-forward because of those changes, stop and report that.
+  - Discard the uncommitted changes, then continue with pull and startup. Do this only when the user selects this choice.
+  - Stop. Do not pull, stash, reset, or start the server.
+
+Wait for the answer, then follow it. Do not decide for the user.
+
 ## Before pulling
 
-From the repo root, check branch, tracking, and working tree.
+From the repo root, confirm the branch and tracking.
 
-- Stay on `main` tracking `origin/main` with a clean working tree.
-- If the tree is dirty, or the branch is not `main`, stop and report that. Do not stash, reset, or pull.
+- Stay on `main` tracking `origin/main`.
+- If the branch is not `main`, or it does not track `origin/main`, stop and report that. Do not switch branches, stash, reset, or pull.
 
 ## Pull
 

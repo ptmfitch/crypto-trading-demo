@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { StatCard } from "@/components/StatCard";
 import { getBtcQuote } from "@/lib/btc-market";
 import { quoteDelayLabel, type BtcQuoteStatus } from "@/lib/btc-quote";
+import { settleDueRecurringBuy } from "@/lib/settle-recurring-buy";
 import { BtcPriceChart } from "./_components/BtcPriceChart";
 import { TradeForm } from "./_components/TradeForm";
 
@@ -23,23 +24,22 @@ function portfolioValue(usdt: number, btc: number, usd: number | null) {
 }
 
 async function getDashboardData(userId: string) {
+  const quote = await getBtcQuote();
+  const recurring = await settleDueRecurringBuy(userId, quote);
   const wallet = await prisma.wallet.findUnique({ where: { userId } });
   if (!wallet) {
     console.error("Dashboard Error: Wallet not found for user:", userId);
     return null;
   }
 
-  const [tradeCount, quote] = await Promise.all([
-    prisma.trade.count({ where: { userId } }),
-    getBtcQuote(),
-  ]);
+  const tradeCount = await prisma.trade.count({ where: { userId } });
 
   const usdt = Number(wallet.usdtBalance);
   const btc = Number(wallet.btcBalance);
   const totalValue = portfolioValue(usdt, btc, quote.usd);
   const pnl = totalValue == null ? null : totalValue - 10000;
 
-  return { wallet, tradeCount, quote, totalValue, pnl };
+  return { wallet, tradeCount, quote, totalValue, pnl, recurring };
 }
 
 function priceStat(status: BtcQuoteStatus, usd: number | null) {
@@ -90,7 +90,7 @@ export default async function DashboardPage() {
     );
   }
 
-  const { wallet, quote, totalValue, pnl, tradeCount } = data;
+  const { wallet, quote, totalValue, pnl, tradeCount, recurring } = data;
   const pnlColor =
     pnl == null ? "text-muted-foreground" : pnl >= 0 ? "text-green-500" : "text-red-500";
   const price = priceStat(quote.status, quote.usd);
@@ -160,6 +160,10 @@ export default async function DashboardPage() {
               quoteStatus={quote.status}
               usdtBalance={Number(wallet.usdtBalance)}
               btcBalance={Number(wallet.btcBalance)}
+              nextBuyLabel={recurring.nextBuyLabel}
+              savedAmount={recurring.savedAmount}
+              savedCadence={recurring.savedCadence}
+              recurringNotice={recurring.notice}
             />
           </div>
         </div>

@@ -1,18 +1,21 @@
 "use client";
 
+import { saveRecurringBuy } from "@/actions/recurring-buy";
 import { executeTrade } from "@/actions/trade";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   quoteDelayLabel,
   type BtcQuoteStatus,
 } from "@/lib/btc-quote";
+import type { Cadence } from "@/lib/recurring-buy";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -28,6 +31,10 @@ interface TradeFormProps {
   quoteStatus: BtcQuoteStatus;
   usdtBalance: number;
   btcBalance: number;
+  nextBuyLabel: string;
+  savedAmount: number | null;
+  savedCadence: Cadence;
+  recurringNotice: string | null;
 }
 
 function isQuoteStatus(value: unknown): value is BtcQuoteStatus {
@@ -39,6 +46,10 @@ export function TradeForm({
   quoteStatus: initialQuoteStatus,
   usdtBalance,
   btcBalance,
+  nextBuyLabel,
+  savedAmount,
+  savedCadence,
+  recurringNotice,
 }: TradeFormProps) {
   const [btcPrice, setBtcPrice] = useState<number | null>(initialBtcPrice);
   const [quoteStatus, setQuoteStatus] = useState<BtcQuoteStatus>(
@@ -46,6 +57,16 @@ export function TradeForm({
   );
   const [tradeType, setTradeType] = useState<"BUY" | "SELL">("BUY");
   const [isPending, startTransition] = useTransition();
+  const [recurringAmount, setRecurringAmount] = useState(
+    savedAmount == null ? "" : savedAmount.toFixed(2)
+  );
+  const [cadence, setCadence] = useState<Cadence>(savedCadence);
+  const [isSavingPlan, startSavingPlan] = useTransition();
+
+  useEffect(() => {
+    setRecurringAmount(savedAmount == null ? "" : savedAmount.toFixed(2));
+    setCadence(savedCadence);
+  }, [savedAmount, savedCadence]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -136,9 +157,22 @@ export function TradeForm({
         asset: spendAsset,
       };
       const result = await executeTrade(payload);
-      if (result.success) {
+      if ("success" in result) {
         toast.success(result.success);
         form.reset({ amount: 0 });
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  function onSaveRecurring(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const amount = Number(recurringAmount);
+    startSavingPlan(async () => {
+      const result = await saveRecurringBuy({ amount, cadence });
+      if ("success" in result) {
+        toast.success(result.success);
       } else {
         toast.error(result.error);
       }
@@ -237,6 +271,50 @@ export function TradeForm({
               Buying and selling stay paused until a live quote returns.
             </p>
           ) : null}
+        </form>
+        <form onSubmit={onSaveRecurring} className="mt-6 space-y-3 border-t pt-4">
+          <p className="text-sm font-medium">{nextBuyLabel}</p>
+          {recurringNotice ? (
+            <p className="text-sm text-muted-foreground">{recurringNotice}</p>
+          ) : null}
+          <div className="space-y-2">
+            <label htmlFor="recurring-amount" className="text-sm font-medium">
+              Recurring amount
+            </label>
+            <div className="relative">
+              <Input
+                id="recurring-amount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                className="pr-16"
+                value={recurringAmount}
+                onChange={(event) => setRecurringAmount(event.target.value)}
+                placeholder="50.00"
+              />
+              <span className="absolute inset-y-0 right-4 flex items-center text-muted-foreground font-semibold">
+                USDT
+              </span>
+            </div>
+          </div>
+          <ToggleGroup
+            type="single"
+            value={cadence}
+            onValueChange={(value) => {
+              if (value === "daily" || value === "weekly") setCadence(value);
+            }}
+            variant="outline"
+            className="w-full"
+          >
+            <ToggleGroupItem value="daily">Daily</ToggleGroupItem>
+            <ToggleGroupItem value="weekly">Weekly</ToggleGroupItem>
+          </ToggleGroup>
+          <Button type="submit" variant="secondary" className="w-full" disabled={isSavingPlan}>
+            {isSavingPlan ? "Saving..." : "Save recurring buy"}
+          </Button>
+          <p className="text-xs text-center text-muted-foreground">
+            Due buys run on this page when the quote is live.
+          </p>
         </form>
       </CardContent>
     </Card>

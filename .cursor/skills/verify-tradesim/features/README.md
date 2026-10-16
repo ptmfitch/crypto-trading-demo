@@ -44,4 +44,5 @@ Each feature file starts with an H1 title and one paragraph describing the user-
 - [Login](./login.md) covers email and password sign-in onto the dashboard.
 - [Buy BTC](./buy-btc.md) covers a cash purchase from the dashboard and the updated balances.
 - [Price delayed](./price-delayed.md) covers a CoinGecko miss that keeps the dashboard and pauses trading.
+- [Recurring buy](./recurring-buy.md) covers one scheduled dollar buy per user, including a skip while the quote is delayed.
 - [Profile](./profile.md) covers the performance report and trade history.

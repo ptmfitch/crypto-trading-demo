@@ -85,11 +85,12 @@ export async function executeTrade(values: z.infer<typeof TradeSchema>) {
       const btcDisplay = btcAmount.toDP(6);
       const usdtDisplay = usdtAmount.toDP(2);
 
-      return {
-        message: `Successfully ${
-          tradeType === "BUY" ? "bought" : "sold"
-        } ${btcDisplay} BTC for $${usdtDisplay}`,
-      };
+      const message =
+        tradeType === "BUY"
+          ? `Bought ≈ ${btcDisplay} BTC with $${usdtDisplay}`
+          : `Sold ≈ ${btcDisplay} BTC for $${usdtDisplay}`;
+
+      return { message };
     });
 
     revalidatePath("/dashboard");

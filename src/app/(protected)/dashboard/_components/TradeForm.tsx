@@ -12,7 +12,7 @@ import {
 } from "@/lib/btc-quote";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -22,6 +22,10 @@ const formSchema = z.object({
     .number()
     .positive({ message: "Amount must be greater than 0" }),
 });
+
+type TradeType = "BUY" | "SELL";
+type SpendAsset = "USDT" | "BTC";
+type Step = "amount" | "review";
 
 interface TradeFormProps {
   initialBtcPrice: number | null;
@@ -34,6 +38,56 @@ function isQuoteStatus(value: unknown): value is BtcQuoteStatus {
   return value === "fresh" || value === "stale" || value === "unavailable";
 }
 
+function isTradeType(value: string): value is TradeType {
+  return value === "BUY" || value === "SELL";
+}
+
+function sideTypeLabel(tradeType: TradeType) {
+  return tradeType === "BUY" ? "Buy BTC" : "Sell BTC";
+}
+
+function reviewButtonLabel(tradeType: TradeType) {
+  return tradeType === "BUY" ? "Review buy" : "Review sell";
+}
+
+function confirmButtonLabel(tradeType: TradeType) {
+  return tradeType === "BUY" ? "Confirm buy" : "Confirm sell";
+}
+
+function quoteReceive(spend: number, price: number | null, spendingUsdt: boolean) {
+  if (!(spend > 0) || price == null || !(price > 0)) return 0;
+  return spendingUsdt ? spend / price : spend * price;
+}
+
+function formatNumber(value: number, minDigits: number, maxDigits: number) {
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: minDigits,
+    maximumFractionDigits: maxDigits,
+  });
+}
+
+function formatSpend(amount: number, asset: SpendAsset) {
+  if (asset === "USDT") return `$${formatNumber(amount, 2, 2)}`;
+  return `${formatNumber(amount, 2, 8)} BTC`;
+}
+
+function formatReceive(amount: number, asset: SpendAsset) {
+  if (asset === "USDT") return `≈ $${formatNumber(amount, 2, 2)}`;
+  return `≈ ${formatNumber(amount, 2, 8)} BTC`;
+}
+
+function formatQuoteTime(timestamp: number) {
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function receiveDecimals(asset: SpendAsset) {
+  return asset === "USDT" ? 2 : 8;
+}
+
 export function TradeForm({
   initialBtcPrice,
   quoteStatus: initialQuoteStatus,
@@ -44,8 +98,13 @@ export function TradeForm({
   const [quoteStatus, setQuoteStatus] = useState<BtcQuoteStatus>(
     initialQuoteStatus
   );
-  const [tradeType, setTradeType] = useState<"BUY" | "SELL">("BUY");
+  const [priceUpdatedAt, setPriceUpdatedAt] = useState<number | null>(null);
+  const [pricePulse, setPricePulse] = useState(false);
+  const [tradeType, setTradeType] = useState<TradeType>("BUY");
+  const [step, setStep] = useState<Step>("amount");
+  const [reviewedAmount, setReviewedAmount] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
+  const reviewQuoteAt = useRef<number | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -53,35 +112,40 @@ export function TradeForm({
   });
   const amount = form.watch("amount");
 
-  // Determine which asset is being spent and which is being received
-  const spendAsset: "USDT" | "BTC" = tradeType === "BUY" ? "USDT" : "BTC";
-  const receiveAsset = tradeType === "BUY" ? "BTC" : "USDT";
+  const spendAsset: SpendAsset = tradeType === "BUY" ? "USDT" : "BTC";
+  const receiveAsset: SpendAsset = tradeType === "BUY" ? "BTC" : "USDT";
   const spendBalance = tradeType === "BUY" ? usdtBalance : btcBalance;
+  const numericAmount = typeof amount === "number" ? amount : Number(amount);
+  const receiveAmount = quoteReceive(
+    numericAmount,
+    btcPrice,
+    spendAsset === "USDT"
+  );
+  const reviewedReceive = quoteReceive(
+    reviewedAmount ?? 0,
+    btcPrice,
+    spendAsset === "USDT"
+  );
 
-  // Calculate the received amount based on the input amount
-  const receiveAmount =
-    amount > 0 && btcPrice != null && btcPrice > 0
-      ? spendAsset === "USDT"
-        ? amount / btcPrice
-        : amount * btcPrice
-      : 0;
-
-  // Function to handle quick percentage clicks
   const handlePercentageClick = (percentage: number) => {
     if (tradeType === "SELL" && percentage === 1) {
-      // For 100% sell, use the exact btcBalance
-      form.setValue("amount", parseFloat(btcBalance.toFixed(8)));
+      form.setValue("amount", parseFloat(btcBalance.toFixed(8)), {
+        shouldValidate: true,
+      });
     } else {
       const value = spendBalance * percentage;
       form.setValue(
         "amount",
-        parseFloat(value.toFixed(spendAsset === "USDT" ? 2 : 8))
+        parseFloat(value.toFixed(spendAsset === "USDT" ? 2 : 8)),
+        { shouldValidate: true }
       );
     }
   };
 
-  // Refetch price periodically. A failed refresh keeps the last quote and
-  // marks it delayed instead of clearing the form.
+  useEffect(() => {
+    setPriceUpdatedAt(Date.now());
+  }, []);
+
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
@@ -89,17 +153,29 @@ export function TradeForm({
         const data = await response.json();
         const usd = data?.bitcoin?.usd;
         const status = data?.quote?.status;
+        const fetchedAtRaw = data?.quote?.fetchedAt;
+        const fetchedAtMs =
+          typeof fetchedAtRaw === "string"
+            ? Date.parse(fetchedAtRaw)
+            : Number.NaN;
+
         if (isQuoteStatus(status)) {
           if (status === "unavailable") {
             setBtcPrice(null);
           } else if (typeof usd === "number" && usd > 0) {
             setBtcPrice(usd);
+            if (Number.isFinite(fetchedAtMs)) {
+              setPriceUpdatedAt(fetchedAtMs);
+            } else {
+              setPriceUpdatedAt(Date.now());
+            }
           }
           setQuoteStatus(status);
           return;
         }
         if (typeof usd === "number" && usd > 0) {
           setBtcPrice(usd);
+          setPriceUpdatedAt(Date.now());
         }
         setQuoteStatus((current) =>
           current === "fresh" ? "stale" : current
@@ -114,6 +190,23 @@ export function TradeForm({
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (step !== "review") {
+      reviewQuoteAt.current = null;
+      return;
+    }
+    if (reviewQuoteAt.current === null) {
+      reviewQuoteAt.current = priceUpdatedAt;
+      return;
+    }
+    if (priceUpdatedAt === null || priceUpdatedAt === reviewQuoteAt.current) {
+      return;
+    }
+    setPricePulse(true);
+    const timeout = window.setTimeout(() => setPricePulse(false), 700);
+    return () => window.clearTimeout(timeout);
+  }, [priceUpdatedAt, step]);
+
   const delayLabel = quoteDelayLabel(quoteStatus);
   const quoteReady = quoteStatus === "fresh" && btcPrice != null && btcPrice > 0;
   const priceText =
@@ -124,33 +217,62 @@ export function TradeForm({
           maximumFractionDigits: 2,
         })}`;
 
+  function returnToAmount() {
+    setStep("amount");
+    setPricePulse(false);
+  }
+
   function onSubmit(values: z.infer<typeof formSchema>) {
+    if (step === "amount") {
+      if (!quoteReady) {
+        toast.error("Trading is paused until a live BTC quote returns.");
+        return;
+      }
+      setReviewedAmount(values.amount);
+      setStep("review");
+      return;
+    }
+
     if (!quoteReady) {
       toast.error("Trading is paused until a live BTC quote returns.");
       return;
     }
+
+    const spend = reviewedAmount ?? values.amount;
     startTransition(async () => {
-      const payload = {
+      const result = await executeTrade({
         tradeType,
-        amount: values.amount,
+        amount: spend,
         asset: spendAsset,
-      };
-      const result = await executeTrade(payload);
+      });
       if (result.success) {
         toast.success(result.success);
         form.reset({ amount: 0 });
+        setReviewedAmount(null);
+        setStep("amount");
       } else {
         toast.error(result.error);
       }
     });
   }
 
+  const buyActionClass =
+    "bg-[hsl(var(--chart-positive))] text-white hover:bg-[hsl(var(--chart-positive)/0.9)]";
+  const sellActionClass = "bg-destructive text-white hover:bg-destructive/90";
+  const actionClass = tradeType === "BUY" ? buyActionClass : sellActionClass;
+
+  const payReadOnly = step === "review";
+
   return (
     <Card>
       <CardHeader>
         <Tabs
           value={tradeType}
-          onValueChange={(value) => setTradeType(value as "BUY" | "SELL")}
+          onValueChange={(value) => {
+            if (!isTradeType(value)) return;
+            setTradeType(value);
+            returnToAmount();
+          }}
           className="w-full"
         >
           <TabsList className="grid w-full grid-cols-2">
@@ -174,14 +296,18 @@ export function TradeForm({
           ) : null}
         </div>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          {/* --- SPEND INPUT --- */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">You Pay</label>
+            <label htmlFor="trade-amount" className="text-sm font-medium">
+              You Pay
+            </label>
             <div className="relative">
               <Input
+                id="trade-amount"
                 type="number"
                 step="any"
                 className="pr-16 text-lg"
+                readOnly={payReadOnly}
+                aria-readonly={payReadOnly}
                 {...form.register("amount")}
                 placeholder="0.00"
               />
@@ -189,35 +315,42 @@ export function TradeForm({
                 {spendAsset}
               </span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-muted-foreground">
-                Available: {spendBalance.toFixed(spendAsset === "USDT" ? 2 : 6)}{" "}
-                {spendAsset}
-              </span>
-              <div className="space-x-1">
-                {[25, 50, 100].map((p) => (
-                  <Button
-                    key={p}
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handlePercentageClick(p / 1000)}
-                  >
-                    {p}%
-                  </Button>
-                ))}
+            {form.formState.errors.amount ? (
+              <p className="text-xs text-destructive">
+                {form.formState.errors.amount.message}
+              </p>
+            ) : null}
+            {step === "amount" ? (
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-muted-foreground">
+                  Available:{" "}
+                  {spendBalance.toFixed(spendAsset === "USDT" ? 2 : 6)}{" "}
+                  {spendAsset}
+                </span>
+                <div className="space-x-1">
+                  {[25, 50, 100].map((p) => (
+                    <Button
+                      key={p}
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handlePercentageClick(p / 1000)}
+                    >
+                      {p}%
+                    </Button>
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : null}
           </div>
 
-          {/* --- RECEIVE DISPLAY --- */}
           <div className="space-y-2">
             <label className="text-sm font-medium">You Receive</label>
             <div className="relative">
               <Input
                 readOnly
                 className="pr-16 text-lg bg-muted/50"
-                value={receiveAmount.toFixed(2)}
+                value={receiveAmount.toFixed(receiveDecimals(receiveAsset))}
               />
               <span className="absolute inset-y-0 right-4 flex items-center text-muted-foreground font-semibold">
                 {receiveAsset}
@@ -225,12 +358,70 @@ export function TradeForm({
             </div>
           </div>
 
+          {step === "review" ? (
+            <div className="space-y-3 rounded-lg border bg-muted/40 px-4 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold">
+                  {reviewButtonLabel(tradeType)}
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto px-2 py-1"
+                  onClick={returnToAmount}
+                  disabled={isPending}
+                >
+                  Edit
+                </Button>
+              </div>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+                <dt className="text-muted-foreground">Type</dt>
+                <dd className="text-right font-medium tabular-nums">
+                  {sideTypeLabel(tradeType)}
+                </dd>
+                <dt className="text-muted-foreground">Spend</dt>
+                <dd className="text-right font-medium tabular-nums">
+                  {formatSpend(reviewedAmount ?? 0, spendAsset)}
+                </dd>
+                <dt className="text-muted-foreground">Receive</dt>
+                <dd className="text-right font-medium tabular-nums">
+                  {formatReceive(reviewedReceive, receiveAsset)}
+                </dd>
+                <dt className="text-muted-foreground">Price (live)</dt>
+                <dd
+                  className={cn(
+                    "text-right font-medium tabular-nums",
+                    pricePulse && "animate-pulse"
+                  )}
+                >
+                  {priceText}
+                  {quoteReady && priceUpdatedAt ? (
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                      · {formatQuoteTime(priceUpdatedAt)}
+                    </span>
+                  ) : null}
+                </dd>
+              </dl>
+            </div>
+          ) : null}
+
           <Button
             type="submit"
-            className="w-full"
-            disabled={isPending || !quoteReady}
+            className={cn("w-full text-lg font-semibold", actionClass)}
+            disabled={
+              isPending ||
+              !quoteReady ||
+              (step === "amount"
+                ? !(numericAmount > 0)
+                : !(reviewedAmount != null && reviewedAmount > 0))
+            }
           >
-            {isPending ? "Processing..." : `${tradeType} BTC`}
+            {isPending
+              ? "Processing..."
+              : step === "amount"
+                ? reviewButtonLabel(tradeType)
+                : confirmButtonLabel(tradeType)}
           </Button>
           {delayLabel ? (
             <p className="text-xs text-center text-muted-foreground">

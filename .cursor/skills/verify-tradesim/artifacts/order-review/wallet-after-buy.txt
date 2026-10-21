@@ -1,0 +1,6 @@
+email                    name         usdtBalance  btcBalance         
+-----------------------  -----------  -----------  -------------------
+verify-user@example.com  Verify User  9900         0.00120108578154652
+trades
+------
+1     

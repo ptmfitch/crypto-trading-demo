@@ -1,0 +1,6 @@
+email                    name         usdtBalance  btcBalance
+-----------------------  -----------  -----------  ----------
+verify-user@example.com  Verify User  10000        0         
+trades
+------
+0     

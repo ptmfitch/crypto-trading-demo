@@ -215,6 +215,15 @@ const FIND_SCRIPT = `async (request) => {
     element.form.requestSubmit(element);
     return { action: "submit", name: accessibleName(element) };
   }
+  const pointerInit = { bubbles: true, cancelable: true, button: 0, pointerId: 1, pointerType: "mouse" };
+  element.dispatchEvent(new PointerEvent("pointerdown", pointerInit));
+  element.dispatchEvent(
+    new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 })
+  );
+  element.dispatchEvent(new PointerEvent("pointerup", pointerInit));
+  element.dispatchEvent(
+    new MouseEvent("mouseup", { bubbles: true, cancelable: true, button: 0 })
+  );
   element.click();
   return { action: "click", name: accessibleName(element) };
 }`;

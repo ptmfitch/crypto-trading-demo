@@ -24,6 +24,47 @@ export type ResolvedQuote = {
   nextCache: CachedQuote | null;
 };
 
+export type PriceFeedError = {
+  title: string;
+  body: string;
+};
+
+function formatQuoteTime(fetchedAt: number): string {
+  return new Date(fetchedAt).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+export function priceFeedError(
+  status: BtcQuoteStatus,
+  fetchedAt: number | null
+): PriceFeedError | null {
+  switch (status) {
+    case "fresh":
+      return null;
+    case "stale": {
+      const time =
+        fetchedAt != null && Number.isFinite(fetchedAt)
+          ? formatQuoteTime(fetchedAt)
+          : "earlier";
+      return {
+        title: "Can't reach the BTC price feed",
+        body: `Showing the last known price from ${time}. Trading is paused until the feed reconnects.`,
+      };
+    }
+    case "unavailable":
+      return {
+        title: "Can't reach the BTC price feed",
+        body: "No BTC price is available. Your wallet is still shown; trading is paused until the feed reconnects.",
+      };
+    default: {
+      const exhaustive: never = status;
+      return exhaustive;
+    }
+  }
+}
+
 export function quoteDelayLabel(status: BtcQuoteStatus): string | null {
   switch (status) {
     case "fresh":

@@ -1,18 +1,19 @@
 "use client";
 
 import { executeTrade } from "@/actions/trade";
+import { useBtcQuote } from "./BtcQuoteProvider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  priceFeedError,
   quoteDelayLabel,
-  type BtcQuoteStatus,
 } from "@/lib/btc-quote";
 import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -24,26 +25,12 @@ const formSchema = z.object({
 });
 
 interface TradeFormProps {
-  initialBtcPrice: number | null;
-  quoteStatus: BtcQuoteStatus;
   usdtBalance: number;
   btcBalance: number;
 }
 
-function isQuoteStatus(value: unknown): value is BtcQuoteStatus {
-  return value === "fresh" || value === "stale" || value === "unavailable";
-}
-
-export function TradeForm({
-  initialBtcPrice,
-  quoteStatus: initialQuoteStatus,
-  usdtBalance,
-  btcBalance,
-}: TradeFormProps) {
-  const [btcPrice, setBtcPrice] = useState<number | null>(initialBtcPrice);
-  const [quoteStatus, setQuoteStatus] = useState<BtcQuoteStatus>(
-    initialQuoteStatus
-  );
+export function TradeForm({ usdtBalance, btcBalance }: TradeFormProps) {
+  const { usd: btcPrice, status: quoteStatus, fetchedAt } = useBtcQuote();
   const [tradeType, setTradeType] = useState<"BUY" | "SELL">("BUY");
   const [isPending, startTransition] = useTransition();
 
@@ -53,12 +40,10 @@ export function TradeForm({
   });
   const amount = form.watch("amount");
 
-  // Determine which asset is being spent and which is being received
   const spendAsset: "USDT" | "BTC" = tradeType === "BUY" ? "USDT" : "BTC";
   const receiveAsset = tradeType === "BUY" ? "BTC" : "USDT";
   const spendBalance = tradeType === "BUY" ? usdtBalance : btcBalance;
 
-  // Calculate the received amount based on the input amount
   const receiveAmount =
     amount > 0 && btcPrice != null && btcPrice > 0
       ? spendAsset === "USDT"
@@ -66,10 +51,8 @@ export function TradeForm({
         : amount * btcPrice
       : 0;
 
-  // Function to handle quick percentage clicks
   const handlePercentageClick = (percentage: number) => {
     if (tradeType === "SELL" && percentage === 1) {
-      // For 100% sell, use the exact btcBalance
       form.setValue("amount", parseFloat(btcBalance.toFixed(8)));
     } else {
       const value = spendBalance * percentage;
@@ -80,42 +63,10 @@ export function TradeForm({
     }
   };
 
-  // Refetch price periodically. A failed refresh keeps the last quote and
-  // marks it delayed instead of clearing the form.
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const response = await fetch("/api/btc-price", { cache: "no-store" });
-        const data = await response.json();
-        const usd = data?.bitcoin?.usd;
-        const status = data?.quote?.status;
-        if (isQuoteStatus(status)) {
-          if (status === "unavailable") {
-            setBtcPrice(null);
-          } else if (typeof usd === "number" && usd > 0) {
-            setBtcPrice(usd);
-          }
-          setQuoteStatus(status);
-          return;
-        }
-        if (typeof usd === "number" && usd > 0) {
-          setBtcPrice(usd);
-        }
-        setQuoteStatus((current) =>
-          current === "fresh" ? "stale" : current
-        );
-      } catch (error) {
-        console.error("Client-side error fetching BTC price:", error);
-        setQuoteStatus((current) =>
-          current === "unavailable" ? "unavailable" : "stale"
-        );
-      }
-    }, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
   const delayLabel = quoteDelayLabel(quoteStatus);
-  const quoteReady = quoteStatus === "fresh" && btcPrice != null && btcPrice > 0;
+  const feedError = priceFeedError(quoteStatus, fetchedAt);
+  const quoteReady =
+    quoteStatus === "fresh" && btcPrice != null && btcPrice > 0;
   const priceText =
     btcPrice == null
       ? "—"
@@ -174,7 +125,6 @@ export function TradeForm({
           ) : null}
         </div>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          {/* --- SPEND INPUT --- */}
           <div className="space-y-2">
             <label className="text-sm font-medium">You Pay</label>
             <div className="relative">
@@ -210,7 +160,6 @@ export function TradeForm({
             </div>
           </div>
 
-          {/* --- RECEIVE DISPLAY --- */}
           <div className="space-y-2">
             <label className="text-sm font-medium">You Receive</label>
             <div className="relative">
@@ -232,9 +181,9 @@ export function TradeForm({
           >
             {isPending ? "Processing..." : `${tradeType} BTC`}
           </Button>
-          {delayLabel ? (
-            <p className="text-xs text-center text-muted-foreground">
-              Buying and selling stay paused until a live quote returns.
+          {feedError ? (
+            <p className="text-xs text-center text-destructive">
+              Price feed not connected. Trading is paused.
             </p>
           ) : null}
         </form>

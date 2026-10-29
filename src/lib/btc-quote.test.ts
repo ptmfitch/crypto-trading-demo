@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   assertTradableQuote,
   FRESH_TTL_MS,
+  priceFeedError,
   quoteDelayLabel,
   resolveBtcQuote,
   TRADE_PAUSED_ERROR,
@@ -78,6 +79,27 @@ describe("resolveBtcQuote", () => {
       upstream: { ok: false },
     });
     assert.equal(quote.status, "unavailable");
+  });
+});
+
+describe("priceFeedError", () => {
+  it("returns null when the quote is fresh", () => {
+    assert.equal(priceFeedError("fresh", NOW), null);
+  });
+
+  it("describes a stale quote with the last-known time", () => {
+    const message = priceFeedError("stale", NOW - 120_000);
+    assert.ok(message);
+    assert.equal(message.title, "Can't reach the BTC price feed");
+    assert.match(message.body, /last known price from/);
+    assert.match(message.body, /Trading is paused/);
+  });
+
+  it("describes an unavailable quote", () => {
+    const message = priceFeedError("unavailable", null);
+    assert.ok(message);
+    assert.equal(message.title, "Can't reach the BTC price feed");
+    assert.match(message.body, /No BTC price is available/);
   });
 });
 

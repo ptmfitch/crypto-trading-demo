@@ -30,10 +30,8 @@ export type PriceFeedError = {
 };
 
 function formatQuoteTime(fetchedAt: number): string {
-  return new Date(fetchedAt).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  // UTC and locale-independent so SSR and the browser render the same string.
+  return `${new Date(fetchedAt).toISOString().slice(0, 16).replace("T", " ")} UTC`;
 }
 
 export function priceFeedError(

@@ -91,7 +91,7 @@ describe("priceFeedError", () => {
     const message = priceFeedError("stale", NOW - 120_000);
     assert.ok(message);
     assert.equal(message.title, "Can't reach the BTC price feed");
-    assert.match(message.body, /last known price from/);
+    assert.match(message.body, /last known price from 2023-11-14 22:11 UTC/);
     assert.match(message.body, /Trading is paused/);
   });
 

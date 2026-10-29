@@ -41,7 +41,10 @@ export function BtcQuoteProvider({
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch("/api/btc-price", { cache: "no-store" });
+        const response = await fetch("/api/btc-price", {
+          cache: "no-store",
+          signal: AbortSignal.timeout(9_000),
+        });
         const data = await response.json();
         const usd = data?.bitcoin?.usd;
         const status = data?.quote?.status;

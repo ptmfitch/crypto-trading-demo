@@ -6,6 +6,10 @@ import { redirect } from "next/navigation";
 import { StatCard } from "@/components/StatCard";
 import { getBtcQuote } from "@/lib/btc-market";
 import { quoteDelayLabel, type BtcQuoteStatus } from "@/lib/btc-quote";
+import {
+  BtcQuoteProvider,
+  PriceFeedBanner,
+} from "./_components/BtcQuoteProvider";
 import { BtcPriceChart } from "./_components/BtcPriceChart";
 import { TradeForm } from "./_components/TradeForm";
 
@@ -101,69 +105,79 @@ export default async function DashboardPage() {
         ? "BTC value unavailable"
         : undefined;
 
+  const initialQuote = {
+    usd: quote.usd,
+    status: quote.status,
+    fetchedAt: quote.fetchedAt,
+  };
+
   return (
     <main className="flex-1 bg-muted/40">
-      <div className="container mx-auto py-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">
-            Welcome Back, {session.user.name || "Trader"}!
-          </h1>
-          <p className="text-muted-foreground">
-            Here&apos;s your trading dashboard overview.
-          </p>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-6">
-          <StatCard
-            title="Portfolio Value"
-            value={totalValue == null ? "—" : formatUsd(totalValue)}
-            icon={Wallet}
-            description={portfolioDescription}
-          />
-          <StatCard
-            title="Total P&L"
-            value={
-              pnl == null
-                ? "—"
-                : `${pnl >= 0 ? "+" : ""}${formatUsd(pnl)}`
-            }
-            icon={TrendingUp}
-            color={pnlColor}
-            href="/profile"
-            description={
-              quote.status === "stale" ? "Includes a delayed BTC quote" : undefined
-            }
-          />
-          <StatCard
-            title="Live BTC Price"
-            value={price.value}
-            icon={DollarSign}
-            color={price.color}
-            description={price.description}
-          />
-          <StatCard
-            title="Total Trades"
-            value={tradeCount.toString()}
-            icon={ListChecks}
-            href="/profile"
-          />
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <BtcPriceChart />
+      <BtcQuoteProvider initialQuote={initialQuote}>
+        <div className="container mx-auto py-8">
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold">
+              Welcome Back, {session.user.name || "Trader"}!
+            </h1>
+            <p className="text-muted-foreground">
+              Here&apos;s your trading dashboard overview.
+            </p>
           </div>
 
-          <div className="lg:col-span-1">
-            <TradeForm
-              initialBtcPrice={quote.usd}
-              quoteStatus={quote.status}
-              usdtBalance={Number(wallet.usdtBalance)}
-              btcBalance={Number(wallet.btcBalance)}
+          <PriceFeedBanner />
+
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-6">
+            <StatCard
+              title="Portfolio Value"
+              value={totalValue == null ? "—" : formatUsd(totalValue)}
+              icon={Wallet}
+              description={portfolioDescription}
+            />
+            <StatCard
+              title="Total P&L"
+              value={
+                pnl == null
+                  ? "—"
+                  : `${pnl >= 0 ? "+" : ""}${formatUsd(pnl)}`
+              }
+              icon={TrendingUp}
+              color={pnlColor}
+              href="/profile"
+              description={
+                quote.status === "stale"
+                  ? "Includes a delayed BTC quote"
+                  : undefined
+              }
+            />
+            <StatCard
+              title="Live BTC Price"
+              value={price.value}
+              icon={DollarSign}
+              color={price.color}
+              description={price.description}
+            />
+            <StatCard
+              title="Total Trades"
+              value={tradeCount.toString()}
+              icon={ListChecks}
+              href="/profile"
             />
           </div>
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <BtcPriceChart />
+            </div>
+
+            <div className="lg:col-span-1">
+              <TradeForm
+                usdtBalance={Number(wallet.usdtBalance)}
+                btcBalance={Number(wallet.btcBalance)}
+              />
+            </div>
+          </div>
         </div>
-      </div>
+      </BtcQuoteProvider>
     </main>
   );
 }

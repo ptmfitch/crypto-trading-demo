@@ -135,7 +135,13 @@ export async function getBtcQuote(): Promise<BtcQuote> {
     ? ({ ok: false } as const)
     : await fetchCoinGeckoPrice();
   const resolved = resolveBtcQuote({ now, cached, upstream });
-  if (resolved.nextCache) writeJson(priceCachePath(), resolved.nextCache);
+  if (resolved.nextCache) {
+    try {
+      writeJson(priceCachePath(), resolved.nextCache);
+    } catch (error) {
+      console.error("[BTC Price] cache write failed", error);
+    }
+  }
   return strip(resolved);
 }
 
